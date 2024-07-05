@@ -1,0 +1,29 @@
+apiVersion: operator.tigera.io/v1
+kind: TigeraStatus
+metadata:
+  creationTimestamp: "2025-01-01T20:01:09Z"
+  generation: 1
+  name: apiserver
+  resourceVersion: "6014"
+  uid: 90625480-bfef-4b91-a121-31312a6a810b
+spec: {}
+status:
+  conditions:
+  - lastTransitionTime: "2025-01-01T20:01:39Z"
+    message: All Objects Available
+    observedGeneration: 1
+    reason: AllObjectsAvailable
+    status: "False"
+    type: Progressing
+  - lastTransitionTime: "2025-01-01T20:20:04Z"
+    message: All Objects Available
+    observedGeneration: 1
+    reason: AllObjectsAvailable
+    status: "False"
+    type: Degraded
+  - lastTransitionTime: "2025-01-01T20:20:04Z"
+    message: All objects available
+    observedGeneration: 1
+    reason: AllObjectsAvailable
+    status: "True"
+    type: Available

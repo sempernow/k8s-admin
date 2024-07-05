@@ -1,0 +1,58 @@
+.
+├── cni
+│   ├── calico
+│   │   ├── manifest-method
+│   │   └── operator-method
+│   │       └── api-resources
+│   ├── cilium
+│   │   └── star-wars-demo
+│   └── kube-router
+├── csi
+│   ├── csi-driver-nfs
+│   ├── csi-driver-smb
+│   ├── local-path-provisioner
+│   ├── minio
+│   ├── nfs-server-on-rhel
+│   │   └── kerberos
+│   ├── nfs-subdir-external-provisioner
+│   └── rook
+│       └── examples
+│           └── csi
+│               └── rbd
+├── ingress
+│   ├── ingress-nginx
+│   │   ├── e2e
+│   │   └── grafana-dashboards
+│   ├── tls
+│   │   └── kube.lime.lan
+│   └── traefik
+├── logging
+│   ├── elastic
+│   │   ├── eck
+│   │   ├── efk-chatgpt
+│   │   │   └── 04-fluentbit.v0.0.1-fails
+│   │   ├── efk-devopskube
+│   │   │   ├── elasticsearch
+│   │   │   ├── fluentd
+│   │   │   └── kibana
+│   │   ├── efk-digitalocean
+│   │   └── efk-studytonight
+│   ├── log-collectors
+│   └── loki
+├── logs
+├── observability
+│   ├── metrics
+│   │   ├── dashboard
+│   │   ├── iperf3
+│   │   ├── metrics-server
+│   │   └── prometheus-grafana
+│   │       └── kps
+│   └── tracing
+├── scripts
+│   └── systemd
+└── security
+    ├── secrets
+    │   └── vault
+    └── trivy-operator
+
+56 directories

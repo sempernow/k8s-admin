@@ -1,0 +1,36 @@
+---
+## Test NFS access with Pod app having container mount /data of PV nfs-common-pv
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: test-nfs-pv
+  labels:
+    app: test-nfs
+spec:
+  storageClassName: nfs
+  nfs:
+    ## This path (dirname: test-nfs-pv) must exist at NFS host
+    ## under the SERVER:EXPORT : 192.168.11.100:/srv/nfs/k8s
+    path: /srv/nfs/k8s/test-nfs-pv
+    server: 192.168.11.100 ## a0.lime.lan
+  capacity:
+    storage: 1Gi
+  accessModes:
+  - ReadWriteMany
+  volumeMode: Filesystem
+  persistentVolumeReclaimPolicy: Delete
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: test-nfs-pvc
+  labels:
+    app: test-nfs
+spec:
+  storageClassName: nfs 
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi

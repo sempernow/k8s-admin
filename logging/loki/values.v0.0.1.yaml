@@ -1,0 +1,32 @@
+## On-prem, NFS, minimal
+loki:
+  storage:
+    type: filesystem
+
+  schemaConfig:
+    configs:
+    - from: 2020-10-24
+      store: boltdb-shipper
+      object_store: filesystem
+      schema: v11
+      index:
+        prefix: index_
+        period: 24h
+
+  compactor:
+    shared_store: filesystem
+
+  rulerConfig:
+    storage:
+      type: local
+
+persistence:
+  enabled: true
+  storageClassName: nfs-client
+  accessModes:
+    - ReadWriteOnce
+  size: 10Gi
+
+## Optional: If you want to disable runtime config (advanced users only)
+# runtimeConfig:
+#   enabled: false

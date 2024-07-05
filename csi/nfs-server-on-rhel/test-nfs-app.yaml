@@ -1,0 +1,61 @@
+---
+## Test NFS access with Pod app having container mount /data of PV nfs-common-pv
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-nfs-pod
+  labels:
+    app: test-nfs
+spec:
+  initContainers:
+    - name: init-volume
+      image: busybox
+      # @ NFS-server host 
+      # UID : id nfsanon : uid=50000(nfsanon) gid=50000(nfsanon) groups=50000(nfsanon)
+      # GID : getent group ad-linux-users : ad-linux-users:*:322202601:admin,u2,u1
+      #command: ["sh", "-c", "chown 50000:322202601 /data && chmod 0770 /data"]
+      command: ["sh", "-c", "chown 50000:50000 /data && chmod 0775 /data"]
+      env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+      volumeMounts:
+        - name: data
+          mountPath: /data
+          ## subPathExpr : Isolated (per Pod) subdir under shared volume /data
+          ## Useful in multi-Pod application or stack.
+          #subPathExpr: $(POD_NAME)
+  containers:
+    - name: app
+      image: busybox
+      command: 
+      - "sh"
+      - "-c"
+      - |
+        while true
+        do 
+            fname=test-$(date -Is)
+            touch /data/${fname//:/.} &&
+                sleep 60 ||
+                    exit 11
+        done
+      env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+      volumeMounts:
+        - name: data
+          mountPath: /data
+          #subPathExpr: $(POD_NAME)
+      securityContext:
+        runAsUser: 50000      # nfsanon
+        #runAsGroup: 322202601 # ad-linux-users
+        runAsGroup: 50000 
+  restartPolicy: Never
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: test-nfs-pvc

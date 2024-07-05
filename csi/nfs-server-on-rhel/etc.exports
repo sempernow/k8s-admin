@@ -1,0 +1,5 @@
+## AuthN/AuthZ : Allow client to downgrade security, yet default to hightest (krb5p) 
+#/srv/nfs/k8s    192.168.11.0/24(rw,sync,sec=krb5p:krb5i:krb5:sys,root_squash,no_subtree_check)
+/srv/nfs/k8s    192.168.11.0/24(rw,sync,no_root_squash,no_subtree_check)
+## Performance 
+#/srv/nfs/k8s    192.168.11.0/24(rw,async,no_wdelay,no_subtree_check,no_root_squash,fsid=0)

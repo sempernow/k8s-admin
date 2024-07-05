@@ -1,0 +1,25 @@
+---
+## GitLab EE 17.1 Documentation
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    #nginx.ingress.kubernetes.io/use-regex: "true"
+    #nginx.ingress.kubernetes.io/rewrite-target: /$1
+    nginx.ingress.kubernetes.io/app-root: /17.1
+  name: gitlab-docs
+  #namespace: default
+spec:
+  ingressClassName: nginx
+  rules:
+  - http:
+      paths:
+      - backend:
+          service:
+            name: gitlab-docs
+            port:
+              number: 4000
+        #path: /(.*)
+        path: /
+        #pathType: ImplementationSpecific
+        pathType: Prefix

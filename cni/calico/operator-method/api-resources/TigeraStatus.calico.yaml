@@ -1,0 +1,29 @@
+apiVersion: operator.tigera.io/v1
+kind: TigeraStatus
+metadata:
+  creationTimestamp: "2025-01-01T20:01:09Z"
+  generation: 1
+  name: calico
+  resourceVersion: "6031"
+  uid: 35c13b83-75d1-4474-8b69-022531aed350
+spec: {}
+status:
+  conditions:
+  - lastTransitionTime: "2025-01-01T20:01:44Z"
+    message: All Objects Available
+    observedGeneration: 3
+    reason: AllObjectsAvailable
+    status: "False"
+    type: Degraded
+  - lastTransitionTime: "2025-01-01T20:20:09Z"
+    message: All objects available
+    observedGeneration: 3
+    reason: AllObjectsAvailable
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2025-01-01T20:20:09Z"
+    message: All Objects Available
+    observedGeneration: 3
+    reason: AllObjectsAvailable
+    status: "False"
+    type: Progressing

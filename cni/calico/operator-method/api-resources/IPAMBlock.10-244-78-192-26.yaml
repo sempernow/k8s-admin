@@ -1,0 +1,175 @@
+apiVersion: crd.projectcalico.org/v1
+kind: IPAMBlock
+metadata:
+  annotations:
+    projectcalico.org/metadata: '{"creationTimestamp":null}'
+  creationTimestamp: "2025-01-01T20:07:17Z"
+  generation: 11
+  name: 10-244-78-192-26
+  resourceVersion: "5688"
+  uid: b031c4eb-0b35-49a8-a602-151c7abf0d50
+spec:
+  affinity: host:a2
+  allocations:
+  - null
+  - null
+  - null
+  - 0
+  - 1
+  - 2
+  - 3
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  attributes:
+  - handle_id: k8s-pod-network.1018c82101079099aa95926dea546727fccc8c1732ed638a03b7a763ea7ba882
+    secondary:
+      namespace: calico-apiserver
+      node: a2
+      pod: calico-apiserver-75d9546d78-87kqq
+      timestamp: 2025-01-01 20:19:20.587822777 +0000 UTC
+  - handle_id: k8s-pod-network.3bff58e4e802bb6ef731a59e82cfc949187905c94323411dcf7da439ba1826c5
+    secondary:
+      namespace: calico-system
+      node: a2
+      pod: csi-node-driver-xtt8t
+      timestamp: 2025-01-01 20:19:21.281321197 +0000 UTC
+  - handle_id: k8s-pod-network.d1fecd16cd579d887aeef9bfa18dd1915193f32f58bcfdf1d568bb7549dc337b
+    secondary:
+      namespace: calico-system
+      node: a2
+      pod: calico-kube-controllers-c955c5648-t4q59
+      timestamp: 2025-01-01 20:19:21.926839329 +0000 UTC
+  - handle_id: k8s-pod-network.92aed93cb4da416b84889aa31f63c9e6e764f9d1e65a417b0c4753f60fb5f97b
+    secondary:
+      namespace: kube-system
+      node: a2
+      pod: coredns-76f75df574-g7vq7
+      timestamp: 2025-01-01 20:19:22.427079144 +0000 UTC
+  cidr: 10.244.78.192/26
+  deleted: false
+  sequenceNumber: 1735762037887365196
+  sequenceNumberForAllocation:
+    "0": 1735762037887365186
+    "1": 1735762037887365187
+    "2": 1735762037887365188
+    "3": 1735762037887365192
+    "4": 1735762037887365193
+    "5": 1735762037887365194
+    "6": 1735762037887365195
+  strictAffinity: false
+  unallocated:
+  - 7
+  - 8
+  - 9
+  - 10
+  - 11
+  - 12
+  - 13
+  - 14
+  - 15
+  - 16
+  - 17
+  - 18
+  - 19
+  - 20
+  - 21
+  - 22
+  - 23
+  - 24
+  - 25
+  - 26
+  - 27
+  - 28
+  - 29
+  - 30
+  - 31
+  - 32
+  - 33
+  - 34
+  - 35
+  - 36
+  - 37
+  - 38
+  - 39
+  - 40
+  - 41
+  - 42
+  - 43
+  - 44
+  - 45
+  - 46
+  - 47
+  - 48
+  - 49
+  - 50
+  - 51
+  - 52
+  - 53
+  - 54
+  - 55
+  - 56
+  - 57
+  - 58
+  - 59
+  - 60
+  - 61
+  - 62
+  - 63
+  - 0
+  - 2
+  - 1

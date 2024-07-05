@@ -1,0 +1,29 @@
+apiVersion: operator.tigera.io/v1
+kind: TigeraStatus
+metadata:
+  creationTimestamp: "2025-01-01T20:01:09Z"
+  generation: 1
+  name: ippools
+  resourceVersion: "5965"
+  uid: a6d7e9e5-e340-4dcc-8200-2667e4b135ac
+spec: {}
+status:
+  conditions:
+  - lastTransitionTime: "2025-01-01T20:19:54Z"
+    message: All Objects Available
+    observedGeneration: 3
+    reason: AllObjectsAvailable
+    status: "False"
+    type: Degraded
+  - lastTransitionTime: "2025-01-01T20:01:14Z"
+    message: All objects available
+    observedGeneration: 3
+    reason: AllObjectsAvailable
+    status: "True"
+    type: Available
+  - lastTransitionTime: "2025-01-01T20:01:14Z"
+    message: All Objects Available
+    observedGeneration: 3
+    reason: AllObjectsAvailable
+    status: "False"
+    type: Progressing

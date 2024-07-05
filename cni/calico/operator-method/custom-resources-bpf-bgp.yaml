@@ -1,0 +1,39 @@
+---
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: kubernetes-services-endpoint
+  namespace: tigera-operator
+data:
+  KUBERNETES_SERVICE_HOST: "192.168.11.101"
+  KUBERNETES_SERVICE_PORT: "6443"
+---
+apiVersion: operator.tigera.io/v1
+kind: Installation
+metadata:
+  name: default
+spec:
+  variant: Calico
+  cni:
+    type: Calico
+  controlPlaneReplicas: 2
+  calicoNetwork:
+    linuxDataplane: BPF # BPF, Iptables
+    bgp: Enabled
+    ipPools:
+    - cidr: "10.244.0.0/16" 
+      blockSize: 24 # Per node
+      natOutgoing: Enabled  # Enable NAT for outbound traffic.
+      nodeSelector: all()   # Apply to all nodes.
+      encapsulation: None
+  serviceCIDRs:
+    - "10.96.0.0/12"
+  nodeUpdateStrategy:
+    rollingUpdate:
+      maxUnavailable: 25%   # Configure rolling updates.
+---
+apiVersion: operator.tigera.io/v1
+kind: APIServer
+metadata:
+  name: default
+spec: {}

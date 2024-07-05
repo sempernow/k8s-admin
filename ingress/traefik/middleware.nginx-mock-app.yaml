@@ -1,0 +1,14 @@
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+## ReplacePathRegex
+metadata:
+  name: nginx-mock-app
+  namespace: default
+  labels:
+    app: nginx-mock-app
+spec:
+  replacePathRegex:
+    regex: "^/api/v1/(.*)"
+    #replacement: "/v2/$1"
+    replacement: "/$1"

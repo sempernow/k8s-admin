@@ -1,0 +1,31 @@
+## Ingress only 
+
+grafana:
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hosts:
+      - grafana.kube.lime.lan
+    path: /
+    tls:
+      - hosts:
+        - grafana.kube.lime.lan
+        ## TLS secret in kube-metrics ns
+        ## Comment out if using default TLS cert
+        #secretName: wildcard-kube-lime-lan   
+
+prometheus:
+  ingress:
+    enabled: true
+    ingressClassName: nginx 
+    hosts:
+      - prometheus.kube.lime.lan
+    paths:
+      - /
+    pathType: Prefix
+    tls:
+      - hosts:
+        - prometheus.kube.lime.lan
+        ## TLS secret in kube-metrics ns
+        ## Comment out if using default TLS cert
+        #secretName: wildcard-kube-lime-lan

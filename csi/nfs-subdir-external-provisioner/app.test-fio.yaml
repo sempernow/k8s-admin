@@ -1,0 +1,51 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: test-fio-claim
+  labels:
+    app: fio
+spec:
+  storageClassName: nfs-client
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Mi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-fio-pod
+  labels:
+    app: fio
+spec:
+  containers:
+  - name: test-fio-pod
+    image: nixery.dev/shell/fio:latest
+    command: 
+      # - df 
+      - sleep
+    args:
+      # - -hT
+      - 1d 
+    # command: ["fio"]
+    # args:  
+    # - "--name=randrw"
+    # - "--rw=randrw"
+    # - "--filename=/mnt/fiotest"
+    # - "--size=1G"
+    # - "--bs=4k"
+    # - "--iodepth=32"
+    # - "--direct=1"
+    # - "--runtime=60"
+    # - "--ioengine=libaio"
+    # - "--group_reporting"
+    volumeMounts:
+      - name: nfs-pvc
+        mountPath: "/mnt"
+  restartPolicy: "Never"
+  volumes:
+    - name: nfs-pvc
+      persistentVolumeClaim:
+        claimName: test-fio-claim

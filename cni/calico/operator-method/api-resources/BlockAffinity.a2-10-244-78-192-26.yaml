@@ -1,0 +1,11 @@
+apiVersion: projectcalico.org/v3
+kind: BlockAffinity
+metadata:
+  creationTimestamp: "2025-01-01T20:07:17Z"
+  name: a2-10-244-78-192-26
+  resourceVersion: "3181"
+  uid: bc32b9aa-0afa-4a2e-bdab-d090bb0ea11d
+spec:
+  cidr: 10.244.78.192/26
+  node: a2
+  state: confirmed

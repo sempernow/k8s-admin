@@ -1,0 +1,20 @@
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: nginx-mock-app
+  namespace: default
+  labels:
+    app: nginx-mock-app
+spec:
+  entryPoints:
+    - web
+  routes:
+    - middlewares:
+        - name: nginx-mock-app
+      kind: Rule
+      match: "Host(`app.wsl.lan`) && PathPrefix(`/api/v1`)"
+      #match: "HostSNI(`172.27.240.169`) && PathPrefix(`/api/v1`)"
+      services:
+        - name: nginx-mock-app
+          port: 80

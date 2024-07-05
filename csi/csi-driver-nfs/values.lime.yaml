@@ -1,0 +1,28 @@
+## Create using values.yaml (chart default) as source,
+## deleting all keys except those modified for the target release.
+
+feature:
+  propagateHostMountOptions: true
+
+controller:
+  runOnControlPlane: true
+  enableSnapshotter: true
+  defaultOnDeletePolicy: delete  # available values: delete, retain
+
+externalSnapshotter:
+  enabled: true
+
+storageClass:
+  create: true
+  name: nfs-csi
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+  parameters:
+    server: a0.lime.lan
+    share: /srv/nfs/k8s
+    subDir: /nfs-csi/${pv.metadata.name}/${pvc.metadata.namespace}/${pvc.metadata.name}
+    mountPermissions: "0"
+  reclaimPolicy: Delete
+  volumeBindingMode: Immediate
+  mountOptions:
+    - nfsvers=4.2

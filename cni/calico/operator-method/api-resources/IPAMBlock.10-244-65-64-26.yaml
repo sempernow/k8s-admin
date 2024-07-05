@@ -1,0 +1,175 @@
+apiVersion: crd.projectcalico.org/v1
+kind: IPAMBlock
+metadata:
+  annotations:
+    projectcalico.org/metadata: '{"creationTimestamp":null}'
+  creationTimestamp: "2025-01-01T20:07:31Z"
+  generation: 11
+  name: 10-244-65-64-26
+  resourceVersion: "6611"
+  uid: bd4056af-5aa1-45a6-af20-7dec1ea9615d
+spec:
+  affinity: host:a3
+  allocations:
+  - null
+  - null
+  - null
+  - 0
+  - 1
+  - 2
+  - 3
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  - null
+  attributes:
+  - handle_id: k8s-pod-network.ea8f23f2d789209301627b054777da57d86453cb4683620c065be09f298aff3e
+    secondary:
+      namespace: calico-system
+      node: a3
+      pod: csi-node-driver-2h29z
+      timestamp: 2025-01-01 20:19:30.558621473 +0000 UTC
+  - handle_id: k8s-pod-network.42c63fed96f9970fd78b9ccf5469133797bd898b03567e12fb31981af6754f54
+    secondary:
+      namespace: default
+      node: a3
+      pod: nbox
+      timestamp: 2025-01-01 20:19:30.622132378 +0000 UTC
+  - handle_id: k8s-pod-network.96e678caad73271ef04263a895442aeab59a6ce8eedc4fc38b2ebd27981faf0c
+    secondary:
+      namespace: kube-system
+      node: a3
+      pod: coredns-76f75df574-kgz4x
+      timestamp: 2025-01-01 20:19:30.728728241 +0000 UTC
+  - handle_id: k8s-pod-network.3a7030029bf0b2bbb8db7ea3863fead1d9d1d4b91643431a18f1f2a2c5d01e5b
+    secondary:
+      namespace: calico-apiserver
+      node: a3
+      pod: calico-apiserver-75d9546d78-4756j
+      timestamp: 2025-01-01 20:23:34.704064926 +0000 UTC
+  cidr: 10.244.65.64/26
+  deleted: false
+  sequenceNumber: 1735762051746812782
+  sequenceNumberForAllocation:
+    "0": 1735762051746812772
+    "1": 1735762051746812773
+    "2": 1735762051746812774
+    "3": 1735762051746812778
+    "4": 1735762051746812779
+    "5": 1735762051746812780
+    "6": 1735762051746812781
+  strictAffinity: false
+  unallocated:
+  - 7
+  - 8
+  - 9
+  - 10
+  - 11
+  - 12
+  - 13
+  - 14
+  - 15
+  - 16
+  - 17
+  - 18
+  - 19
+  - 20
+  - 21
+  - 22
+  - 23
+  - 24
+  - 25
+  - 26
+  - 27
+  - 28
+  - 29
+  - 30
+  - 31
+  - 32
+  - 33
+  - 34
+  - 35
+  - 36
+  - 37
+  - 38
+  - 39
+  - 40
+  - 41
+  - 42
+  - 43
+  - 44
+  - 45
+  - 46
+  - 47
+  - 48
+  - 49
+  - 50
+  - 51
+  - 52
+  - 53
+  - 54
+  - 55
+  - 56
+  - 57
+  - 58
+  - 59
+  - 60
+  - 61
+  - 62
+  - 63
+  - 0
+  - 2
+  - 1

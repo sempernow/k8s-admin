@@ -1,0 +1,25 @@
+apiVersion: v1
+data:
+  allow-snippet-annotations: "true"
+  enable-real-ip: "true"
+  forwarded-for-header: X-Forwarded-For
+  proxy-real-ip-cidr: 192.168.11.0/24
+  use-proxy-protocol: "true"
+kind: ConfigMap
+metadata:
+  annotations:
+    meta.helm.sh/release-name: ingress-nginx
+    meta.helm.sh/release-namespace: ingress-nginx
+  creationTimestamp: "2025-06-16T23:41:09Z"
+  labels:
+    app.kubernetes.io/component: controller
+    app.kubernetes.io/instance: ingress-nginx
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: ingress-nginx
+    app.kubernetes.io/part-of: ingress-nginx
+    app.kubernetes.io/version: 1.12.3
+    helm.sh/chart: ingress-nginx-4.12.3
+  name: ingress-nginx-controller
+  namespace: ingress-nginx
+  resourceVersion: "3077960"
+  uid: dd3fa166-9728-49b9-beec-4c843f0fc555

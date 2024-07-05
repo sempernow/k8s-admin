@@ -1,0 +1,21 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-mock-app
+  namespace: default
+  labels:
+    app: nginx-mock-app
+spec:
+  type: ClusterIP
+  selector:
+    app: nginx-mock-app
+  internalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - port: 80
+    protocol: TCP
+    targetPort: 80
+  sessionAffinity: None

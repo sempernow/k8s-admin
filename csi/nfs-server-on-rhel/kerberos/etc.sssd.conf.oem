@@ -1,0 +1,19 @@
+
+[sssd]
+domains = lime.lan
+config_file_version = 2
+services = nss, pam, ssh
+
+[domain/lime.lan]
+ad_server = dc1.lime.lan
+ad_domain = lime.lan
+id_provider = ad
+access_provider = ad
+realmd_tags = manages-system joined-with-adcli 
+ldap_id_mapping = True
+krb5_store_password_if_offline = True
+krb5_realm = LIME.LAN
+cache_credentials = True
+fallback_homedir = /home/%u
+use_fully_qualified_names = False
+default_shell = /bin/bash

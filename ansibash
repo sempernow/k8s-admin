@@ -1,0 +1,182 @@
+#!/usr/bin/env bash
+# ansibash
+# -----------------------------------------------------------------------
+# This is free and unencumbered software released into the public domain.
+# 
+# Anyone is free to copy, modify, publish, use, compile, sell, or
+# distribute this software, either in source code form or as a compiled
+# binary, for any purpose, commercial or non-commercial, and by any
+# means.
+# 
+# In jurisdictions that recognize copyright laws, the author or authors
+# of this software dedicate any and all copyright interest in the
+# software to the public domain. We make this dedication for the benefit
+# of the public at large and to the detriment of our heirs and
+# successors. We intend this dedication to be an overt act of
+# relinquishment in perpetuity of all present and future rights to this
+# software under copyright law.
+# 
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+# EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+# MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+# IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+# OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+# ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+# OTHER DEALINGS IN THE SOFTWARE.
+# 
+# For more information, please refer to <http://unlicense.org/>
+# -----------------------------------------------------------------------
+
+export ANSIBASH_VERSION='0.5.1 build 2025-08-25'
+
+(return 0 2>/dev/null) && isSourced=1 || isSourced=0
+
+_pw(){
+    trim(){ 
+        shopt -s extglob 
+        local x="${@##+([[:space:]])}"; x="${x%%+([[:space:]])}"; printf "%s" "$x"
+    }
+    export -f trim
+    printf "Password: "
+    unset ANSIBASH_PW PW
+    while IFS= read -rsn1 ch; do
+        # Enter: empty (delimiter), \n (Linux), or \r (macOS/WSL)
+        if [[ -z $ch || $ch == $'\n' || $ch == $'\r' ]]; then
+            printf '\n'
+            break
+        fi
+        # Backspace/Delete
+        if [[ $ch == $'\177' || $ch == $'\b' ]]; then
+            if ((${#PW})); then
+                PW=${PW%?}
+                printf '\b \b'
+            fi
+        else
+            PW+=$ch
+            printf '\U25cf'
+        fi
+    done
+    export ANSIBASH_PW="$(printf "%s" "$(trim "$PW")" |base64)"
+}
+export _pw
+
+_ansibash(){
+
+    usage(){
+		#>>>  PRESERVE TABs of HEREDOC  <<<
+		cat <<-EOH
+
+		$(ansibash version)
+			
+			  Remotely provision, configure and otherwise manage a declared set of
+			  target hosts using ad-hoc commands and local or remote scripts
+			  via SSH tunnel as user configured in ~/.ssh/config else declared.
+
+			  Effectively a faster, simpler, small subset of Ansible's functionality
+			  requiring nearly no configuration and no syntax beyond Bash.
+
+			  USAGE:
+
+			    ${0##*/} [-x] "COMMAND ['\$local_arg1' ['local arg 2' ['\\\$remote_arg']]...]"
+			    ${0##*/} -c 'COMMAND1 [ARGs[;COMMAND2 [ARGx ["\$remote_arg" [&& COMMAND3 [ARGy]]]]]...]'
+			    ${0##*/} -s "/path/to/local/script.sh [ARGx ['\$local_arg' ['\\\$remote_arg']]...]"
+			    ${0##*/} -u /path/to/local/source [/path/to/remote/parent (Default:~)]
+			    ${0##*/} -d /path/to/remote/source [/path/to/local/parent (Default:.)]
+			    source ${0##*/} sudopass [PASSWORD|clear (Default: <Interactive prompt>]    (For sudo only)
+			    ${0##*/} version
+		EOH
+    }
+    want(){
+		#>>>  PRESERVE TABs of HEREDOC  <<<
+		cat <<-EOH
+
+			  ENVIRONMENT:
+
+			    export ANSIBASH_TARGET_LIST='host1 host2.local 10.160.111.22'                    (Required)
+			    export ANSIBASH_USER='<Override, else ssh_config Host.User, else current USER>'  (Optional)
+			    export ANSIBASH_VERBOSE='<Any value sets verbose mode (Default unset)>'          (Optional)
+		EOH
+    }
+    have(){
+        #>>>  PRESERVE TABs of HEREDOC  <<<
+		cat <<-EOH
+
+		  ANSIBASH_TARGET_LIST='$ANSIBASH_TARGET_LIST'
+		  ANSIBASH_USER='$ANSIBASH_USER'
+		  ANSIBASH_VERBOSE='$ANSIBASH_VERBOSE'
+		  $_ANSIBASH_PW
+		EOH
+    }
+    ssh_user(){
+        # ARGs: [Host]
+        unset _ssh_user # Priority: ANSIBASH_USER, else if ssh_config Host.User exist and Host is $1, else current USER.
+        [[ $ANSIBASH_USER ]] && { echo "$ANSIBASH_USER";return 0; }
+        [[ $1 ]] && _ssh_user=$(grep -A5 'Host ' ~/.ssh/config |grep -A5 " $1" |grep User |awk '{print $2}' |head -n1)
+        [[ $_ssh_user ]] && echo "$_ssh_user" || echo "$(id -un)"
+    }
+
+    [[ "${1,,}" == 'sudopass' ]] && {
+        (( isSourced )) || { echo "  USAGE: source ${0##*/} sudopass [clear]";exit 0; }
+        type -t base64 >/dev/null 2>&1 || { echo "  REQUIREs base64";return 0; }
+        [[ $2 ]] && [[ "${2,,}" == 'clear' ]] && { unset ANSIBASH_PW;return 0; }
+        [[ $2 ]] && [[ "${2,,}" != 'clear' ]] && { export ANSIBASH_PW="$(echo "$2" |base64)";return 0; }
+        #read -p 'Enter sudo password: ' -s ANSIBASH_PW
+        #[[ $ANSIBASH_PW ]] && export ANSIBASH_PW="$(echo "$ANSIBASH_PW" |base64)" || unset ANSIBASH_PW
+        _pw
+        [[ $ANSIBASH_PW ]] || {
+            echo "Password is UNSET"
+            unset ANSIBASH_PW
+        }
+
+        return 0
+    }
+
+    (( isSourced )) || {
+        [[ $ANSIBASH_PW ]] && _ANSIBASH_PW='ANSIBASH_PW=●●●' || unset _ANSIBASH_PW
+        [[ $ANSIBASH_TARGET_LIST ]] || { usage;want;exit; }
+        [[ $@ ]] || { usage;have;exit; }
+        [[ $ANSIBASH_PW ]] && pw="$(echo "$ANSIBASH_PW" |base64 -d)" || unset pw
+    }
+
+    [[ "${1:0:1}" != '-' ]] && mode='-x' || { mode=$1;shift; }
+    [[ $4 ]] && more='…' || unset more
+    [[ "$mode" == '-s' ]] && { script=$1;shift; } || unset script
+    [[ "$mode" == '-u' ]] && {
+        [[ $2 ]] && target=$2 || target=${1##*/}
+    }
+
+    for host in $ANSIBASH_TARGET_LIST
+    do
+        conn=$(ssh_user $host)@$host
+        [[ $ANSIBASH_VERBOSE ]] && echo "=== $conn : $script $1 $2 $3 $more" || echo "=== $conn"
+        ssh $conn logger "ansibash : BY $(id -un)@$(hostname) AS $conn"
+        [[ $pw ]] && {
+            [[ $mode == '-x' ]] && { echo "$pw" |ssh -tt $conn "$@" |sed "s/$pw/●●●/";continue; }
+            [[ $mode == '-c' ]] && { echo ">>>  Method not implemented  <<<";return $?; }
+            [[ $mode == '-s' ]] && { echo ">>>  Method not implemented  <<<";return $?; }
+        }
+        [[ $pw ]] || {
+            [[ $mode == '-x' ]] && { ssh $conn "$@";continue; }
+            [[ $mode == '-c' ]] && { ssh $conn /bin/bash -c "'$@'" && continue || return $?; }
+            [[ $mode == '-s' ]] && {
+                [[ -r $script ]] || return 2
+                cat $script |ssh -T $conn /bin/bash -s - "$@" && continue || return $?
+            }
+        }
+        [[ $mode == '-u' ]] && { scp -pr "$1" $conn:$target && continue || return $?; }
+        [[ $mode == '-d' ]] && { scp -pr "$conn:$1" "${2:-.}/${host}_${1##*/}" && continue || return $?; }
+        ## TODO : Add and prefer rsync method(s) to handle push/pull.
+    done
+}
+
+[[ "$1" == 'version' ]] && {
+    echo "  v$ANSIBASH_VERSION"
+    (( isSourced )) && return 0 || exit 0
+}
+
+_ansibash "$@"
+code=$?
+(( $code )) && echo  "ERROR: $code"
+(( isSourced )) || exit $code
+
+

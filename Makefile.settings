@@ -1,4 +1,1 @@
-## @ Makefile.settings : This file is DYNAMICALLY GENERATED  (See Makefile recipes)
-export K8S_CERTIFICATE_KEY ?= e7bd0818d8ff317537d2f65ab553a3185f0ddae646dafc224a2e98e873acc4bc
-export K8S_CA_CERT_HASH    ?= sha256:212b51ebc405c032152bd9fe8264d88fd876afc971c247562be8da61d6aec3c2
-export K8S_BOOTSTRAP_TOKEN ?= gw2n8a.gcpq9fhyysc7jw4k
+

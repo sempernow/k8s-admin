@@ -1,0 +1,63 @@
+---
+## https://chat.deepseek.com/share/vw0suzul47n8vg3xog 
+## Data flow :
+# Kubernetes Pod Logs → Fluent Bit (processing) → Kafka (buffer/queue) → Your Consumers (Elasticsearch, etc.)
+## Prerequisite :
+#  kafka-topics.sh --create --topic fluent-bit --bootstrap-server kafka-0:9092 --partitions 3 --replication-factor 2
+## Verify : Consume from topic to verify arriving logs
+# kafka-console-consumer.sh --topic fluent-bit --bootstrap-server kafka-0:9092 --from-beginning
+## Check Fluent Bit metrics for Kafka errors :
+# kubectl logs -l app=fluent-bit -n logging |grep kafka
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluent-bit-config
+  namespace: logging
+data:
+  fluent-bit.conf: |
+    [SERVICE]
+        Daemon Off
+        Flush 1
+        Log_Level info
+        Parsers_File parsers.conf
+        HTTP_Server On
+        HTTP_Listen 0.0.0.0
+        HTTP_Port 2020
+
+    [INPUT]
+        Name tail
+        Path /var/log/containers/*.log
+        Parser cri
+        Tag kube.*
+        Mem_Buf_Limit 50MB
+        Skip_Long_Lines On
+
+    [FILTER]
+        Name kubernetes
+        Match kube.*
+        Merge_Log On
+        Keep_Log Off
+        K8S-Logging.Parser On
+        K8S-Logging.Exclude On
+
+    [OUTPUT]
+        Name kafka
+        Match *
+        Brokers kafka-0:9092,kafka-1:9092
+        Topics fluent-bit
+        # Optional but useful settings:
+        rdkafka.log.connection.close false
+        rdkafka.request.required.acks 1
+        rdkafka.queue.buffering.max.messages 100000
+        rdkafka.message.send.max.retries 3
+        rdkafka.retry.backoff.ms 100
+        format json  # Send as JSON objects
+        timestamp_key @timestamp
+
+  parsers.conf: |
+    [PARSER]
+        Name cri
+        Format regex
+        Regex ^(?<time>[^ ]+) (?<stream>stdout|stderr) (?<logtag>[P|F]) (?<log>.*)$
+        Time_Key time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L%z

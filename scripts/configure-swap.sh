@@ -1,37 +1,37 @@
 #!/usr/bin/env bash
-#####################################################
-# Configure swap volumes : disable all (idempotent)
-#
-# >>>  DO NOT disable swap.target (static)  <<<
-#####################################################
+########################################################
+# Disable all swaps 
+# - Idempotent.
+########################################################
+[[ "$(id -u)" -ne 0 ]] && {
+    echo "⚠️  ERR : MUST run as root" >&2
 
-ok(){
-    # Disable swap now and forever (idempotent)
-    ## Disable all swaps of /proc/swaps
-    sudo swapoff -a || return 10  
-    #sudo swapon --show
-    [[ -r /etc/fstab ]] || return 11
-    isOn(){ 
-        echo "$(cat /etc/fstab |grep ' swap' |grep -v '^ *#' |awk '{print $1}')"
-    }
-    swap="$(isOn)";unset device
-    [[ $swap ]] && device="$(echo $swap |awk '{print $1}')"
-    [[ $device ]] && sudo sed -i "s,$swap,#$swap," /etc/fstab
-    [[ $(isOn) ]] && return 1 || return 0
+    exit 11
 }
-ok || exit $?
 
-echo ok
+[[ $(cat /proc/swaps |grep -v Filename) ]] ||
+    exit 0
 
-exit 0
-######
-
-cat /etc/fstab |grep swap
+## Disable swap now and forever : required by kubelet
 ## To find a particular swap, use lsblk 
-lsblk
+swapoff -a  # Disable all swaps of /proc/swaps
+## #############################################
+## >>>  DO NOT disable swap.target (static)  <<<
+## #############################################
+## Comment out any swap entries of /etc/fstab (once)
+## /etc/fstab : unconfigured example 
+    ## /dev/mapper/almalinux-root                /          xfs     defaults                   0 0
+    ## UUID=0ef0e28d-a54d-4cd6-b7f8-f55b5ca9ae03 /boot      xfs     defaults                   0 0
+    ## UUID=B872-847F                            /boot/efi  vfat    umask=0077,shortname=winnt 0 2
+    ## /dev/mapper/almalinux-swap                none       swap    defaults                   0 0
 
-## @ /etc/fstab (Unconfigured example)
-    /dev/mapper/almalinux-root  /          xfs     defaults                   0 0
-    UUID=0ef0e28d-a54d-4cd6     /boot      xfs     defaults                   0 0
-    UUID=B872-847F              /boot/efi  vfat    umask=0077,shortname=winnt 0 2
-    /dev/mapper/almalinux-swap  none       swap    defaults                   0 0
+# Mod /etc/fstab only if swap-device mount is active (not commented out).
+swap_mounted="$(cat /etc/fstab |grep ' swap' |grep -v '^ *#' |awk '{print $1}')"
+[[ $swap_mounted ]] && {
+    device="$(echo $swap_mounted |awk '{print $1}')"
+    sed -i "s,$device,#$device," /etc/fstab
+} 
+
+#sudo swapon --show
+cat /etc/fstab |grep swap
+systemctl daemon-reload

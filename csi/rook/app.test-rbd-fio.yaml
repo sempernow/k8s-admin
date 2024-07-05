@@ -1,0 +1,32 @@
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: test-rbd-fio
+  namespace: default
+spec:
+  storageClassName: rook-ceph-block
+  accessModes:
+    - ReadWriteOnce # Required if rbd
+  resources:
+    requests:
+      storage: 2Gi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-rbd-fio
+spec:
+  containers:
+  - name: test-rbd-fio
+    image: nixery.dev/shell/fio
+    command:
+    - sleep
+    - "3600"
+    volumeMounts:
+    - mountPath: /mnt/test
+      name: test-rbd-fio
+  volumes:
+  - name: test-rbd-fio
+    persistentVolumeClaim:
+      claimName: test-rbd-fio

@@ -1,0 +1,29 @@
+## This minimal values.yaml for kube-prometheus-stack chart
+## includes all changes from its default to provide the core functionality
+## of the chart; to scrape apps via ServiceMonitor and show that in Grafana.
+
+# Skip extras
+alertmanager:
+  enabled: false
+
+prometheusOperator:
+  enabled: true
+
+grafana:
+  enabled: true
+  defaultDashboardsEnabled: true
+  sidecar:
+    dashboards:
+      enabled: true
+    datasources:
+      enabled: true
+
+prometheus:
+  enabled: true
+  prometheusSpec:
+    # To allow scraping beyond this helm installation
+    ruleSelectorNilUsesHelmValues: false
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    probeSelectorNilUsesHelmValues: false
+

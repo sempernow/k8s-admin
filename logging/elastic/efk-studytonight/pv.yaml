@@ -1,0 +1,28 @@
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: elasticsearch-pv
+spec:
+  storageClassName: nfs
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+  nfs:
+    # FAILing
+    server: 192.168.11.100  # a0.lime.lan
+    path: "/srv/nfs/k8s/elasticsearch"  # Subdirectory of export
+  persistentVolumeReclaimPolicy: Retain
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: test-pvc
+spec:
+  storageClassName: nfs-client  # Matches the provisioner's StorageClass
+  accessModes:
+    - ReadWriteOnce  # Or ReadWriteMany if your NFS supports it
+  resources:
+    requests:
+      storage: 10Gi  # Adjust size as needed

@@ -1,0 +1,78 @@
+---
+# Demonstrate that our NFS export, nfs-client SC, and External Provisioner 
+# allow for init containers to set UID:GID and access mode 
+# on the NFS-server subdirectory (pv) created dynamically to satisfy the claim (pvc).
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: test-nfs-secure
+  labels:
+    app: nfs-secure
+spec:
+  storageClassName: nfs-client
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Mi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: test-nfs-secure-pod
+  labels:
+    app: nfs-secure
+spec:
+  restartPolicy: Never
+  initContainers:
+    - name: init-volume
+      image: busybox
+      # @ NFS-server host 
+      # UID : id nfsanon : uid=50000(nfsanon) gid=50000(nfsanon) groups=50000(nfsanon)
+      # GID : getent group ad-linux-users : ad-linux-users:*:322202601:admin,u2,u1
+      #command: ["sh", "-c", "chown 50000:322202601 /data && chmod 0770 /data"]
+      command: ["sh", "-c", "chown $USER:$USER /data && chmod 0770 /data"]
+      env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: USER 
+          value: "200"
+ 
+      volumeMounts:
+        - name: data
+          mountPath: /data
+          subPathExpr: $(POD_NAME)
+  containers:
+    - name: app
+      image: busybox
+      command: 
+      - sh
+      - -c
+      - |
+        stamp=$(date -Is)
+        fname=hello.from.u.$(id -u)@$(hostname -f)@$stamp
+        touch /data/${fname//:/.}
+        echo "$stamp : Hello from user $(id -u) at host $(hostname)"
+        while true;do touch /data/$(hostname -f)-$(date +'%H.%M.%S');sleep 15s;done
+        sleep 1h
+
+      env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: USER   # Not usable at runAs* keys
+          value: "200" # Must be string
+      volumeMounts:
+        - name: data
+          mountPath: /data
+          subPathExpr: $(POD_NAME)
+      securityContext:
+        runAsUser: 200  # Must be int64 : 50000      # nfsanon
+        runAsGroup: 200 # Must be int64 : 322202601 # ad-linux-users
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: test-nfs-secure

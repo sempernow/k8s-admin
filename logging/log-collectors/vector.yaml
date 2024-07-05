@@ -1,0 +1,25 @@
+---
+## https://vector.dev/
+## https://vector.dev/docs/reference/configuration/sources/kubernetes_logs/
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: vector
+spec:
+  template:
+    spec:
+      containers:
+      - name: vector
+        image: timberio/vector:0.21-alpine
+        env:
+        - name: VECTOR_CONFIG
+          value: |
+            [sources.kubernetes_logs]
+              type = "kubernetes_logs"
+              auto_partial_merge = true
+              
+            [sinks.elasticsearch]
+              type = "elasticsearch"
+              inputs = ["kubernetes_logs"]
+              endpoint = "http://elasticsearch:9200"
+              index = "kubernetes-logs-%Y-%m-%d"

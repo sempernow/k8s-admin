@@ -1,0 +1,18 @@
+
+#
+# /etc/fstab
+# Created by anaconda on Sun Jun 16 18:36:11 2024
+#
+# Accessible filesystems, by reference, are maintained under '/dev/disk/'.
+# See man pages fstab(5), findfs(8), mount(8) and/or blkid(8) for more info.
+#
+# After editing this file, run 'systemctl daemon-reload' to update systemd
+# units generated from this file.
+#
+/dev/mapper/rhel-root   /                       xfs     defaults        0 0
+UUID=4bff8019-1cf5-4271-874b-92033cac589d /boot                   xfs     defaults        0 0
+UUID=08AE-EF02          /boot/efi               vfat    umask=0077,shortname=winnt 0 2
+#/dev/mapper/rhel-swap   none                    swap    defaults        0 0
+
+# Unnecessary for K8s NFS Subdir External Provisioner
+a0.lime.lan:/srv/nfs/k8s /mnt/nfs/k8s nfs4 defaults,vers=4.2,sec=sys,_netdev,auto 0 0

@@ -1,0 +1,20 @@
+apiVersion: projectcalico.org/v3
+kind: IPPool
+metadata:
+  creationTimestamp: "2025-01-01T20:01:04Z"
+  generation: 1
+  labels:
+    app.kubernetes.io/managed-by: tigera-operator
+  name: default-ipv4-ippool
+  resourceVersion: "2251"
+  uid: a94f638b-dfe2-4584-a595-bc7be0e0062f
+spec:
+  allowedUses:
+  - Workload
+  - Tunnel
+  blockSize: 26
+  cidr: 10.244.0.0/16
+  ipipMode: Never
+  natOutgoing: true
+  nodeSelector: all()
+  vxlanMode: Never

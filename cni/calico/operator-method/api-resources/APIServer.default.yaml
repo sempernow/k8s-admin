@@ -1,0 +1,33 @@
+apiVersion: operator.tigera.io/v1
+kind: APIServer
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"operator.tigera.io/v1","kind":"APIServer","metadata":{"annotations":{},"name":"default"},"spec":{}}
+  creationTimestamp: "2025-01-01T20:00:57Z"
+  generation: 1
+  name: default
+  resourceVersion: "6038"
+  uid: e689e5eb-2071-4788-bfca-99a32acd2b13
+spec: {}
+status:
+  conditions:
+  - lastTransitionTime: "2025-01-01T20:20:10Z"
+    message: All Objects Available
+    observedGeneration: 1
+    reason: AllObjectsAvailable
+    status: "False"
+    type: Progressing
+  - lastTransitionTime: "2025-01-01T20:20:10Z"
+    message: All Objects Available
+    observedGeneration: 1
+    reason: AllObjectsAvailable
+    status: "False"
+    type: Degraded
+  - lastTransitionTime: "2025-01-01T20:20:10Z"
+    message: All objects available
+    observedGeneration: 1
+    reason: AllObjectsAvailable
+    status: "True"
+    type: Ready
+  state: Ready

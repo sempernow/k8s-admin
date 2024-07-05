@@ -1,0 +1,70 @@
+---
+## Deploy the Demo Application : https://docs.cilium.io/en/stable/gettingstarted/demo/#deploy-the-demo-application
+## Manifest : curl -fsSLO https://raw.githubusercontent.com/cilium/cilium/1.16.5/examples/minikube/http-sw-app.yaml
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: deathstar
+  labels:
+    app.kubernetes.io/name: deathstar
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+  selector:
+    org: empire
+    class: deathstar
+---
+apiVersion: apps/v1
+kind: Deployment
+## Deploymnet deathstar is the resource we want to protect 
+metadata:
+  name: deathstar
+  labels:
+    app.kubernetes.io/name: deathstar
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      org: empire
+      class: deathstar
+  template:
+    metadata:
+      labels:
+        org: empire
+        class: deathstar
+        app.kubernetes.io/name: deathstar
+    spec:
+      containers:
+      - name: deathstar
+        image: quay.io/cilium/starwars:v2.1@sha256:833d915ec68fca3ce83668fc5dae97c455b2134d8f23ef96586f55b894cfb1e8
+---
+apiVersion: v1
+kind: Pod
+## Pod tiefighter is of org empire; deathstar's org; is friendly
+metadata:
+  name: tiefighter
+  labels:
+    org: empire
+    class: tiefighter
+    app.kubernetes.io/name: tiefighter
+spec:
+  containers:
+  - name: spaceship
+    image: quay.io/cilium/json-mock:v1.3.8@sha256:5aad04835eda9025fe4561ad31be77fd55309af8158ca8663a72f6abb78c2603
+---
+apiVersion: v1
+kind: Pod
+## Pod xwing is of org alliance; is enemy of (deathstar's) empire 
+metadata:
+  name: xwing
+  labels:
+    app.kubernetes.io/name: xwing
+    org: alliance
+    class: xwing
+spec:
+  containers:
+  - name: spaceship
+    image: quay.io/cilium/json-mock:v1.3.8@sha256:5aad04835eda9025fe4561ad31be77fd55309af8158ca8663a72f6abb78c2603
+

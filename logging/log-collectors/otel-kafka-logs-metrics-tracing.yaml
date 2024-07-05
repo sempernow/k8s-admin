@@ -1,0 +1,142 @@
+## OpenTelemetry as Unified Collector of Logs, Metrics and Tracing
+## https://chat.deepseek.com/share/y01tpcjmcpe5lgmtbp 
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: otel-collector
+  namespace: observability
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: otel-collector
+rules:
+- apiGroups: [""]
+  resources: ["pods", "nodes"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["nodes/proxy"]
+  verbs: ["get"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: otel-collector
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: otel-collector
+subjects:
+- kind: ServiceAccount
+  name: otel-collector
+  namespace: observability
+
+---
+## For readability, use
+# kubectl create configmap $cm_name --from-file=$key=$file_path
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-collector-config
+data:
+  config.yaml: |
+    receivers:
+      filelog:
+        include: [/var/log/containers/*.log]
+        operators:
+          - type: json_parser
+            timestamp:
+              parse_from: attributes.time
+              layout: '%Y-%m-%dT%H:%M:%S.%LZ'
+          - type: move
+            from: attributes.log
+            to: body
+          - type: remove
+            field: attributes.time
+
+    processors:
+      batch:
+      memory_limiter:
+        check_interval: 1s
+        limit_mib: 500
+        spike_limit_mib: 200
+      resourcedetection:
+        detectors: [kubernetes]
+      k8sattributes:
+      transform:
+        log_statements:
+          - context: log
+            statements:
+              - set(attributes["k8s.pod.name"], attributes["k8s.pod.name"])
+              - merge_maps(body, attributes, "upsert")
+              - delete_key(attributes, "log")
+    
+    exporters:
+      # To Kafka
+      kafka:
+        brokers: ["kafka-0:9092", "kafka-1:9092"]
+        topic: "otel-logs"
+        protocol_version: 2.0.0
+      
+      # Or directly to Elasticsearch
+      elasticsearch:
+        endpoints: ["http://elasticsearch:9200"]
+        logs_index: "kubernetes-logs"
+        # For debugging
+      logging:
+        loglevel: debug
+    
+    service:
+      pipelines:
+        logs:
+          receivers: [filelog]
+          processors: [batch, memory_limiter, resourcedetection, k8sattributes, transform]
+          exporters: [kafka, logging]  # or [elasticsearch, logging]
+
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: otel-collector
+  namespace: observability
+spec:
+  selector:
+    matchLabels:
+      app: otel-collector
+  template:
+    metadata:
+      labels:
+        app: otel-collector
+    spec:
+      containers:
+      - name: otel-collector
+        image: otel/opentelemetry-collector-contrib:0.69.0
+        volumeMounts:
+        - name: otel-config
+          mountPath: /etc/otel
+        - name: varlog
+          mountPath: /var/log
+        - name: varlibdockercontainers
+          mountPath: /var/lib/docker/containers
+          readOnly: true
+        resources:
+          limits:
+            memory: 500Mi
+          requests:
+            memory: 200Mi
+            cpu: 100m
+      volumes:
+      - name: otel-config
+        configMap:
+          name: otel-collector-config
+      - name: varlog
+        hostPath:
+          path: /var/log
+      - name: varlibdockercontainers
+        hostPath:
+          path: /var/lib/docker/containers
+      serviceAccountName: otel-collector

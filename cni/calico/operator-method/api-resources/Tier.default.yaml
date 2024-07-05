@@ -1,0 +1,10 @@
+apiVersion: projectcalico.org/v3
+kind: Tier
+metadata:
+  creationTimestamp: "2025-01-01T20:01:10Z"
+  name: default
+  resourceVersion: "2030"
+  uid: 8322b990-1827-4aee-8231-7c3f3be0397f
+spec:
+  defaultAction: Deny
+  order: 1000000

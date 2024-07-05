@@ -1,0 +1,12 @@
+apiVersion: projectcalico.org/v3
+kind: ClusterInformation
+metadata:
+  creationTimestamp: "2025-01-01T20:01:10Z"
+  name: default
+  resourceVersion: "2101"
+  uid: 66af12af-7903-47cb-8986-66265161283c
+spec:
+  calicoVersion: v3.29.1
+  clusterGUID: 0eed3b35d6d04dad8d2c931e8b4263a7
+  clusterType: typha,kdd,k8s,operator,bgp,kubeadm
+  datastoreReady: true

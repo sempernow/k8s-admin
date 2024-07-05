@@ -1,0 +1,165 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fluent-bit
+  namespace: kube-logging
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: fluent-bit
+rules:
+- apiGroups: [""]
+  resources:
+  - pods
+  - namespaces
+  verbs:
+  - get
+  - list
+  - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: fluent-bit
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: fluent-bit
+subjects:
+- kind: ServiceAccount
+  name: fluent-bit
+  namespace: kube-logging
+# ---
+# # 07-fluentbit-service.yaml
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: fluent-bit
+#   namespace: kube-logging
+# spec:
+#   selector:
+#     name: fluent-bit
+#   ports:
+#   - protocol: TCP
+#     port: 2020
+#     targetPort: 2020
+#     name: http
+#   - protocol: TCP
+#     port: 2021
+#     targetPort: 2021
+#     name: monitor
+#   type: ClusterIP
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluent-bit-config
+  namespace: kube-logging
+data:
+  fluent-bit.conf: |
+    [SERVICE]
+        Flush        5
+        Log_Level    info
+        Parsers_File parsers.conf
+
+    [INPUT]
+        Name              tail
+        Path              /var/log/containers/*.log
+        Parser            docker
+        Tag               kube.*
+        Refresh_Interval  5
+        Mem_Buf_Limit     5MB
+        Skip_Long_Lines   On
+        Docker_Mode       On
+
+    [FILTER]
+        Name                kubernetes
+        Match               kube.*
+        Merge_Log           On
+        Merge_Log_Key       log
+        Keep_Log            On
+        Kube_Tag_Prefix     kube.var.log.containers.
+
+    [FILTER]
+        Name                parser
+        Match               kube.*
+        Key_Name            log
+        Parser              nginx
+
+    [FILTER]
+        Name                grep
+        Match               kube.*
+        Exclude             kubernetes.container_name  fluent-bit
+
+    [OUTPUT]
+        Name            es
+        Match           *
+        Host            elasticsearch
+        Port            9200
+        Logstash_Format On
+        Replace_Dots    On
+        Retry_Limit     False
+  parsers.conf: |
+    [PARSER]
+        Name   docker
+        Format json
+        Time_Key time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L
+        Time_Keep On
+
+    [PARSER]
+        Name   nginx
+        Format regex
+        Regex  ^(?<timestamp>[^ ]+) stdout F (?<remote_addr>[^ ]+) - - \[(?<time_local>[^\]]+)\] "(?<request>[^"]*)" (?<status>\d{3}) (?<body_bytes_sent>\d+) "(?<http_referer>[^"]*)" "(?<http_user_agent>[^"]*)"
+        Time_Key time_local
+        Time_Format %d/%b/%Y:%H:%M:%S %z
+        Time_Keep On
+
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: fluent-bit
+  namespace: kube-logging
+  labels:
+    app.kubernetes.io/name: fluent-bit
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: fluent-bit
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: fluent-bit
+    spec:
+      serviceAccountName: fluent-bit
+      containers:
+        - name: fluent-bit
+          image: cr.fluentbit.io/fluent/fluent-bit:2.2.2
+          resources:
+            limits:
+              memory: 200Mi
+            requests:
+              cpu: 100m
+              memory: 100Mi
+          volumeMounts:
+            - name: varlog
+              mountPath: /var/log
+            - name: varlibcontainers
+              mountPath: /var/lib/containerd
+            - name: config
+              mountPath: /fluent-bit/etc/
+      terminationGracePeriodSeconds: 10
+      volumes:
+        - name: varlog
+          hostPath:
+            path: /var/log
+        - name: varlibcontainers
+          hostPath:
+            path: /var/lib/containerd
+        - name: config
+          configMap:
+            name: fluent-bit-config

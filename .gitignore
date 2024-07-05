@@ -1,0 +1,6 @@
+**/LOG.*
+**/*.log
+**/*.html
+**/*.tgz
+**/*.key
+scripts/kubeadm*.yaml

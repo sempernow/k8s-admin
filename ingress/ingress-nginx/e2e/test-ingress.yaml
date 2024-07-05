@@ -1,0 +1,153 @@
+# Mod of ingress-nginx-kind-usage-oem.yaml
+# 
+# This stack is an E2E test of ingress-nginx
+# by demonstrating connectivity to app running in naked Pods, 
+# each having a Service (ClusterIP) available at host network 
+# via Ingress backed by this Ingress Controller.
+# 
+# ☩ k apply -f .
+# ☩ curl http://192.168.11.101:32530/{foo,bar}/hostname
+# foobar
+# ☩ curl -k https://192.168.11.101:30242/bar/{hostname,version}
+# barNOW: 2025-04-27 16:55:46.924523769 +0000 UTC m=+423.928978532
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: foo
+spec:
+  selector:
+    app: foo
+  ports:
+  - port: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bar
+spec:
+  selector:
+    app: bar
+  ports:
+  - port: 8080
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: foo
+  labels:
+    app: foo
+spec:
+  containers:
+  - command:
+    - /agnhost
+    #- fake-gitserver
+    - netexec
+    - --http-port
+    - "8080"
+    image: registry.k8s.io/e2e-test-images/agnhost:2.39
+    name: foo
+---
+## Agnhost is an "Agnostic Host" app (server)
+## Regardless of OS (Win/Linux), responses from its endpoints are identical.
+## https://github.com/kubernetes/kubernetes/tree/master/test/images/agnhost#agnhost
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bar
+  labels:
+    app: bar
+spec:
+  containers:
+  - command:
+    - /agnhost
+    - netexec
+    - --http-port
+    - "8080"
+    image: registry.k8s.io/e2e-test-images/agnhost:2.39
+    name: bar
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: test-ingress-tls
+  # Unlike service mesh such as Istio, 
+  # ingress-nginx has no service discovery,
+  # so create Ingress per stack, in stack's namespace.
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: e2e.kube.lime.lan
+    http:
+      paths:
+      - path: /foo(/|$)(.*) 
+        pathType: ImplementationSpecific 
+        backend:
+          service:
+            name: foo
+            port:
+              number: 8080
+      - path: /bar(/|$)(.*) 
+        pathType: ImplementationSpecific 
+        backend:
+          service:
+            name: bar
+            port:
+              number: 8080
+---
+## If no host is declared, as with test-ingress (below),
+## then all hosts match.
+# ---
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: test-ingress # ip:port
+#   annotations:
+#     # Both snippets are FAILing
+#     # Want to match only IPv4:PORT : Deny FQDN:PORT
+
+#     # nginx.ingress.kubernetes.io/server-snippet: |
+#     #   if ($host !~ "^([0-9]{1,3}\.){3}[0-9]{1,3}$") {
+#     #     return 403;
+#     #   }
+  
+#     # nginx.ingress.kubernetes.io/server-snippet: |
+#     #   set $is_ipv4 0;
+#     #   if ($host ~ ^\d+\.\d+\.\d+\.\d+$) {
+#     #       set $is_ipv4 1;
+#     #   }
+#     #   if ($is_ipv4 = 0) {
+#     #       return 403;
+#     #   }
+#     nginx.ingress.kubernetes.io/rewrite-target: /$2
+# spec:
+#   ingressClassName: nginx
+#   rules:
+#   - http:
+#       paths:
+#       - path: /foo(/|$)(.*) 
+#         pathType: ImplementationSpecific 
+#         backend:
+#           service:
+#             name: foo
+#             port:
+#               number: 8080
+#       - path: /bar(/|$)(.*) 
+#         pathType: ImplementationSpecific 
+#         backend:
+#           service:
+#             name: bar
+#             port:
+#               number: 8080
+#       ## Ingress for Service zoo of Pod foo. To create imperatively: 
+#       ## k expose pod foo --name zoo --port=7777 --target-port=8080 
+#       - path: /zoo(/|$)(.*) 
+#         pathType: ImplementationSpecific 
+#         backend:
+#           service:
+#             name: zoo
+#             port:
+#               number: 7777

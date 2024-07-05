@@ -1,0 +1,10 @@
+apiVersion: projectcalico.org/v3
+kind: Tier
+metadata:
+  creationTimestamp: "2025-01-01T20:01:10Z"
+  name: adminnetworkpolicy
+  resourceVersion: "2031"
+  uid: 6256ce2b-df7a-4c9c-8efd-05a27d8e897c
+spec:
+  defaultAction: Pass
+  order: 1000

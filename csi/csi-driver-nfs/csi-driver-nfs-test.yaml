@@ -1,0 +1,38 @@
+---
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: test-nfs-csi-pvc
+  labels:
+    app: nfs
+spec:
+  storageClassName: nfs-csi
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Mi
+---
+kind: Pod
+apiVersion: v1
+metadata:
+  name: test-nfs-csi-pod
+  labels:
+    app: nfs
+spec:
+  containers:
+  - name: default-perms-ctnr
+    image: busybox:stable
+    command:
+      - "/bin/sh"
+    args:
+      - "-c"
+      - "echo $(date -Is) : Hello from $(hostname -f);touch /mnt/$(id -un)@$(hostname -f)@$(date -u +'%Y-%m-%dT%H.%M.%SZ') && exit 0 || exit 1"
+    volumeMounts:
+      - name: nfs-csi-pvc
+        mountPath: "/mnt"
+  restartPolicy: "Never"
+  volumes:
+    - name: nfs-csi-pvc
+      persistentVolumeClaim:
+        claimName: test-nfs-csi-pvc
