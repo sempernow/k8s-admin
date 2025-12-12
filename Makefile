@@ -616,20 +616,27 @@ calico-pull :
 #calico : calico-operator
 calico : calico-manifest
 calicoctl :
+	@echo -e "\n🔍 kubectl get tigerastatuses (If installed by operator method.)"
+	@kubectl get tigerastatuses 2>/dev/null && kubectl get tigerastatuses || true \
+	    |tee -a ${ADMIN_SRC_DIR}/logs/${LOG_PRE}.callico-status.log 
+	@echo -e "\n🔍 calicoctl node status"
 	ansibash sudo /usr/local/bin/calicoctl node status \
 	    |tee ${ADMIN_SRC_DIR}/logs/${LOG_PRE}.callico-status.log
-	kubectl calico get ippool \
+	@echo -e "🔍 kubectl calico get ippool"
+	@kubectl calico get ippool \
 	    |tee -a ${ADMIN_SRC_DIR}/logs/${LOG_PRE}.callico-status.log
-	kubectl calico ipam check \
+	@echo -e "🔍 kubectl calico ipam show --show-blocks"
+	@kubectl calico ipam show --show-blocks \
 	    |tee -a ${ADMIN_SRC_DIR}/logs/${LOG_PRE}.callico-status.log
-	kubectl calico ipam show --show-blocks \
+	@echo -e "\n🔍 kubectl calico show --ip=${K8S_CONTROL_IP}"
+	@kubectl calico ipam show --ip=${K8S_CONTROL_IP} \
 	    |tee -a ${ADMIN_SRC_DIR}/logs/${LOG_PRE}.callico-status.log
-	kubectl calico ipam show --show-configuration \
+	@echo -e "\n🔍 kubectl calico ipam show --show-configuration"
+	@kubectl calico ipam show --show-configuration \
 	    |tee -a ${ADMIN_SRC_DIR}/logs/${LOG_PRE}.callico-status.log
-	kubectl calico ipam show --ip=${K8S_CONTROL_IP} \
+	@echo -e "\n🔍 kubectl calico ipam check"
+	@kubectl calico ipam check \
 	    |tee -a ${ADMIN_SRC_DIR}/logs/${LOG_PRE}.callico-status.log
-	kubectl get tigerastatuses 2>/dev/null && kubectl get tigerastatuses \
-	    |tee -a ${ADMIN_SRC_DIR}/logs/${LOG_PRE}.callico-status.log || echo
 calico-restart :
 	kubectl -n kube-system rollout restart ds/calico-node
 	kubectl -n kube-system rollout status  ds/calico-node
