@@ -20,8 +20,8 @@ settings_inject(){
             )"
         [[ ${K8S_CERTIFICATE_KEY} ]] || return 22
     }
-    cat $1.tpl |sed "/^ *,/d" |sed "/^\s*$/d" |sed '/^[[:space:]]*#/d' > /tmp/$1
-    envsubst < /tmp/$1 > $1; rm /tmp/$1; echo "ℹ️ Generated: '$1'"
+    cat $1.tpl |sed "/^ *,/d" |sed "/^\s*$/d" |sed '/^[[:space:]]*#/d' > /tmp/manifest
+    envsubst < /tmp/manifest > $1; rm /tmp/manifest; echo "ℹ️ Generated: '$1'"
 }
 settings_purge(){
 	cat <<-EOH |tee Makefile.bootstrap.settings

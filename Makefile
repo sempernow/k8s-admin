@@ -1,6 +1,7 @@
 ##############################################################################
 ## Makefile.settings : Environment Variables for Makefile(s)
 include Makefile.settings
+include Makefile.bootstrap.settings
 # … ⋮ ︙ • ● – — ™ ® © ± ° ¹ ² ³ ¼ ½ ¾ ÷ × ₽ € ¥ £ ¢ ¤ ♻ ⚐ ⚑ ✪ ❤  \ufe0f
 # ☢ ☣ ☠ ¦ ¶ § † ‡ ß µ Ø ƒ Δ ☡ ☈ ☧ ☩ ✚ ☨ ☦ ☓ ♰ ♱ ✖  ☘  웃 𝐀𝐏𝐏 🡸 🡺 ➔
 # ℹ️ ⚠️ ✅ ⌛ 🚀 🚧 🛠️ 🔧 🔍 🧪 👈 ⚡ ❌ 💡 🔒 📊 📈 🧩 📦 🥇 ✨️ 🔚
@@ -423,7 +424,7 @@ init-certs :
 	scp -p ${ADMIN_SRC_DIR}/scripts/kubeadm-init-certs.sh ${ADMIN_USER}@${K8S_NODE_INIT}:. \
 	    && ssh -t ${ADMIN_USER}@${K8S_NODE_INIT} sudo bash kubeadm-init-certs.sh ${K8S_KUBEADM_CONF_INIT} \
 	    |tee ${ADMIN_SRC_DIR}/logs/${LOG_PRE}.init-certs.${UTC}.log
-	scp -p ${ADMIN_USER}@${K8S_NODE_INIT}:Makefile.settings Makefile.${K8S_NODE_INIT}.settings
+	scp -p ${ADMIN_USER}@${K8S_NODE_INIT}:Makefile.bootstrap.settings Makefile.bootstrap.settings
 join-control : join-prep join-now
 join-prep : join-gen join-push
 ## K8S_CERTIFICATE_KEY must be set PRIOR TO RUNNING join-gen
