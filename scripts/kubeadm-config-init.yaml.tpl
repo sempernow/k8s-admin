@@ -3,10 +3,10 @@ apiVersion: kubeadm.k8s.io/v1beta3
 kind: InitConfiguration
 ## https://kubernetes.io/docs/reference/config-api/kubeadm-config.v1beta3/#kubeadm-k8s-io-v1beta3-InitConfiguration
 ## Certificate Key : Declare static ok, even on : 64 char hex : "openssl rand -hex 32"
-certificateKey: K8S_CERTIFICATE_KEY
+certificateKey: $K8S_CERTIFICATE_KEY
 # bootstrapTokens:
 # ## --token=$(kubeadm token generate)
-# - token: K8S_BOOTSTRAP_TOKEN
+# - token: $K8S_BOOTSTRAP_TOKEN
 #   ttl: 24h
 #   usages:
 #   - authentication
@@ -18,9 +18,9 @@ certificateKey: K8S_CERTIFICATE_KEY
 #   advertiseAddress: 1.2.3.4  # IP address of this control node
 #   bindPort: 6443             # 6443 (default)
 nodeRegistration:
-  name: "K8S_NODE_INIT" # Defaults to $(hostname)
+  name: "$K8S_NODE_INIT" # Defaults to $(hostname)
   # imagePullPolicy: IfNotPresent ## Always|Never|IfNotPresent (default)
-  criSocket: K8S_CRI_SOCKET
+  criSocket: $K8S_CRI_SOCKET
   # taints: null   # Default taints on control nodes
   taints: []       # No taints on control nodes
   # taints:        # []core/v1.Taint
@@ -36,8 +36,8 @@ nodeRegistration:
   ## Some kubeletExtraArgs are exclusive to Standalone mode,
   ## which is enabled by omitting `--kubeconfig` flag.
   #   v: "5"
-  #   pod-cidr: "K8S_POD_CIDR"
-  #   cgroup-driver: K8S_CGROUP_DRIVER
+  #   pod-cidr: "$K8S_POD_CIDR"
+  #   cgroup-driver: $K8S_CGROUP_DRIVER
 ---
 apiVersion: kubeadm.k8s.io/v1beta3
 kind: ClusterConfiguration
@@ -45,8 +45,8 @@ kind: ClusterConfiguration
 ## RELEASEs https://kubernetes.io/releases/
 ## Capture after init and store to /etc/kubernetes/kubeadm-config.yaml
 ## kubectl -n kube-system get cm kubeadm-config -o yaml |yq .data.ClusterConfiguration
-kubernetesVersion: K8S_VERSION
-# imageRepository: K8S_REGISTRY
+kubernetesVersion: $K8S_VERSION
+# imageRepository: $K8S_REGISTRY
 apiServer:
   timeoutForControlPlane: 3m # Wait for apiserver to appear
   extraArgs:    # map[string]string : arg(s), each sans leading dashes
@@ -57,15 +57,15 @@ apiServer:
     # Check FIPS compliance of host : cat /proc/sys/crypto/fips_enabled
   extraVolumes: # []HostPathMount
   certSANs:     # []string          : SANs of API Server signing certificate.
-clusterName: K8S_CLUSTER_NAME
+clusterName: $K8S_CLUSTER_NAME
 ## External LB endpoint else that of init node
-controlPlaneEndpoint: "K8S_CONTROL_ENTRYPOINT"
+controlPlaneEndpoint: "$K8S_CONTROL_ENTRYPOINT"
 controllerManager:
 ## https://kubernetes.io/docs/reference/config-api/kubeadm-config.v1beta3/#kubeadm-k8s-io-v1beta3-ControlPlaneComponent
 ## https://kubernetes.io/docs/reference/command-line-tools-reference/kube-controller-manager/
   extraArgs:
     allocate-node-cidrs: "true"
-    cluster-cidr: "K8S_POD_CIDR"
+    cluster-cidr: "$K8S_POD_CIDR"
 #   extraVolumes: []
 # dns: {}
 # etcd:
@@ -74,9 +74,9 @@ controllerManager:
 networking:
   #dnsDomain: cluster.local
   ## Services subnet CIDR : Default is 10.96.0.0/12
-  serviceSubnet: "K8S_SERVICE_CIDR"
+  serviceSubnet: "$K8S_SERVICE_CIDR"
   ## Pod subnet CIDR      : Default is 10.244.0.0/16
-  podSubnet: "K8S_POD_CIDR"
+  podSubnet: "$K8S_POD_CIDR"
 # scheduler: {}
 ---
 apiVersion: kubelet.config.k8s.io/v1beta1
@@ -111,10 +111,12 @@ kind: KubeletConfiguration
 ##   https://mirantis.github.io/cri-dockerd/usage/install/
 containerLogMaxSize: 1Mi  # Default is 10Mi
 containerLogMaxFiles: 5   # Default is 5
-containerRuntimeEndpoint: K8S_CRI_SOCKET
-cgroupDriver: K8S_CGROUP_DRIVER
+containerRuntimeEndpoint: $K8S_CRI_SOCKET
+cgroupDriver: $K8S_CGROUP_DRIVER
 ## Node Allocatable
 ## https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/
+## WARNINGS : General Guidelines 
+## https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/#general-guidelines
 ## Reserve ample resources for control plane, especially if node is dual use.
 ## https://unofficial-kubernetes.readthedocs.io/en/latest/tasks/administer-cluster/reserve-compute-resources/
 ## Rather than Node Allocatable scheme, rely on Pod QoS : Guaranteed
@@ -122,9 +124,11 @@ cgroupDriver: K8S_CGROUP_DRIVER
 # systemReserved:   # host
 #   cpu: "500m"
 #   memory: "1Gi"
+#   ephemeral-storage: "1Gi"
 # kubeReserved:     # K8s
-#   cpu: "500m"
-#   memory: "1Gi"
+#   cpu: "1000m"
+#   memory: "2Gi"
+#   ephemeral-storage: "1Gi"
 # enforceNodeAllocatable:
 #   - "pods"
 #   - "system-reserved"
@@ -139,12 +143,12 @@ hairpinMode: hairpin-veth
 # imageGCLowThresholdPercent: 80
 # imageMinimumGCAge: 2m
 evictionHard:
-  nodefs.available: "10%"
-  imagefs.available: "15%"
-  memory.available: "500Mi"
+  nodefs.available: "<10%"
+  imagefs.available: "<15%"
+  memory.available: "<500Mi"
 evictionSoft:
-  nodefs.available: "15%"
-  imagefs.available: "20%"
+  nodefs.available: "<15%"
+  imagefs.available: "<20%"
 evictionSoftGracePeriod:
   nodefs.available: "1m"
   imagefs.available: "1m"
@@ -181,11 +185,11 @@ kind: KubeProxyConfiguration
 ## @ "kubectl -n kube-system get cm kube-proxy -o yaml |yq -Mr '.data["config.conf"]'"
 ## https://kubernetes.io/docs/reference/config-api/kube-proxy-config.v1alpha1/#kubeproxy-config-k8s-io-v1alpha1-KubeProxyConfiguration
 mode: "ipvs"                            # Use IPVS for better performance and scalability compared to iptables.
-clusterCIDR: "K8S_POD_CIDR"             # Replace with your cluster's pod network CIDR.
+clusterCIDR: "$K8S_POD_CIDR"             # Replace with your cluster's pod network CIDR.
 detectLocalMode: "ClusterCIDR"          # Detect local traffic based on the cluster CIDR.
 healthzBindAddress: "0.0.0.0:10256"
 metricsBindAddress: "0.0.0.0:10249"     # Enable metrics for monitoring tools (Prometheus, etc.).
-# hostnameOverride: "K8S_NODE_INIT"       # Overriding current hostname prevents future changes from being injested by K8s,
+# hostnameOverride: "$K8S_NODE_INIT"       # Overriding current hostname prevents future changes from being injested by K8s,
                                         # which has caused systemic mTLS failure on the subsequent rotation.
                                         # However, this setting would be required at each node?
 ipvs:

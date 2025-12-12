@@ -18,137 +18,6 @@ include Makefile.settings
 
 
 ##############################################################################
-## $(INFO) : USAGE : `$(INFO) "Any !"` in recipe prints quoted str, stylized.
-SHELL   := /bin/bash
-YELLOW  := "\e[1;33m"
-RESTORE := "\e[0m"
-INFO    := @bash -c 'printf $(YELLOW);echo "$$1";printf $(RESTORE)' MESSAGE
-
-
-##############################################################################
-## Project Meta
-
-export PRJ_ROOT := $(shell pwd)
-export LOG_PRE  := make
-export UTC      := $(shell date '+%Y-%m-%dT%H.%M.%Z')
-
-
-##############################################################################
-## TLS : Domain's Offline Root CA
-
-export TLS_CN ?= Lime LAN Root CA
-export TLS_O  ?= Lime LAN
-export TLS_OU ?= lime.lan
-export TLS_C  ?= US
-
-
-##############################################################################
-## Registry
-
-#export CNCF_REGISTRY_IMAGE    ?= registry:2.8.3
-#export CNCF_REGISTRY_HOST     ?= oci.lime.lan
-#export CNCF_REGISTRY_HOST     ?= a0.lime.lan
-#export CNCF_REGISTRY_PORT     ?= 5000
-#export CNCF_REGISTRY_ENDPOINT ?= ${CNCF_REGISTRY_HOST}:${CNCF_REGISTRY_PORT}
-#export CNCF_REGISTRY_STORE    ?= /mnt/${CNCF_REGISTRY_HOST}
-
-
-##############################################################################
-## HAProxy/Keepalived : HA Network Load Balancer (HALB)
-
-export HALB_PROJECT      ?= github.com/sempernow/halb
-export HALB_DOMAIN       ?= lime.lan
-export HALB_FQDN         ?= kube.${HALB_DOMAIN}
-export HALB_FQDN_1       ?= a1.${HALB_DOMAIN}
-export HALB_FQDN_2       ?= a2.${HALB_DOMAIN}
-export HALB_FQDN_3       ?= a3.${HALB_DOMAIN}
-export HALB_MASK         ?= 24
-export HALB_MASK6        ?= 64
-export HALB_DOMAIN_CIDR  ?= 192.168.11.0/${HALB_MASK}
-export HALB_DOMAIN_CIDR6 ?= fd00:11::/${HALB_MASK6}
-export HALB_VIP          ?= 192.168.11.11
-export HALB_VIP6         ?= fd00:11::100
-export HALB_CIDR         ?= ${HALB_VIP}/${HALB_MASK}
-export HALB_CIDR6        ?= ${HALB_VIP6}/${HALB_MASK6}
-export HALB_DEVICE       ?= eth0
-export HALB_PORT_STATS   ?= 8404
-export HALB_PORT_K8S     ?= 8443
-export HALB_PORT_HTTP    ?= 30080
-export HALB_PORT_HTTPS   ?= 30443
-
-
-##############################################################################
-## K8s
-
-## Configurations : https://kubernetes.io/docs/reference/config-api/kubeadm-config.v1beta3/
-## K8s RELEASEs https://kubernetes.io/releases/
-export K8S_CLUSTER_NAME       ?= lime
-#export K8S_VERSION            ?= $(shell curl -sSL https://dl.k8s.io/release/stable.txt)
-export K8S_VERSION            ?= v1.29.6
-#export K8S_VERSION            ?= v1.29.15
-#export K8S_VERSION            ?= v1.33.2
-#export K8S_REGISTRY           ?= ${CNCF_REGISTRY_ENDPOINT}
-export K8S_REGISTRY           ?= registry.k8s.io
-export K8S_VERBOSITY          ?= 5
-export K8S_NODE_INIT          ?= a1
-export K8S_NODES_CONTROL      ?= a3 a2 ${K8S_NODE_INIT}
-export K8S_NODES_WORKER       ?=
-export K8S_NODES              ?= ${K8S_NODES_WORKER} ${K8S_NODES_CONTROL}
-export K8S_NODES_JOIN         ?= a2 a3
-export K8S_KUBEADM_CONF_INIT  ?= kubeadm-config-init.yaml
-export K8S_KUBEADM_CONF_JOIN  ?= kubeadm-config-join.yaml
-export K8S_JOIN_KUBECONFIG    ?= discovery.yaml
-export K8S_NETWORK_DEVICE     ?= ${HALB_DEVICE}
-export K8S_CONTROL_IP         ?= ${HALB_VIP}
-#export K8S_CONTROL_IP         ?= 192.168.11.101
-export K8S_CONTROL_PORT       ?= ${HALB_PORT_K8S}
-#export K8S_CONTROL_PORT       ?= 6443
-export K8S_CONTROL_ENTRYPOINT ?= ${K8S_CONTROL_IP}:${K8S_CONTROL_PORT}
-export K8S_FQDN               ?= kube.${HALB_DOMAIN}
-## Pod and Service CIDRs : Set to Private Address space (RFC 1918) that is SLAAC-compliant .
-export K8S_HOST_CIDR          ?= ${HALB_DOMAIN_CIDR}
-export K8S_HOST_CIDR6         ?= ${HALB_DOMAIN_CIDR6}
-export K8S_SERVICE_CIDR       ?= 10.96.0.0/12
-export K8S_SERVICE_CIDR6      ?= fd00:96::/48
-export K8S_POD_CIDR           ?= 10.244.0.0/16
-export K8S_POD_CIDR6          ?= fd00:244::/64
-export K8S_PEERS              ?= 192.168.11.101 192.168.11.102 192.168.11.103
-export K8S_FW_ZONE_EXTERNAL   ?= k8s-external
-export K8S_FW_ZONE_INTERNAL   ?= k8s-internal
-# @ Cilium eBPF mode
-#export K8S_POD_CIDR           ?= 10.0.0.0/8
-export K8S_NODE_CIDR_MASK     ?= 24
-export K8S_NODE_CIDR6_MASK    ?= 64
-export K8S_CRI_SOCKET         ?= unix:///var/run/containerd/containerd.sock
-export K8S_CGROUP_DRIVER      ?= systemd
-## PKI : See Makefile.settings
-export DOMAIN_CA_CERT := ${PRJ_ROOT}/ingress/tls/lime-DC1-CA.cer
-
-
-##############################################################################
-## Admin
-
-export ADMIN_USER_CONF       ?= github.com/sempernow/userrc
-## Public-key string of ssh user must be in ~/.ssh/authorized_keys of ADMIN_USER at all targets.
-#export ADMIN_USER            ?= $(shell id -un)
-export ADMIN_USER            ?= u2
-export ADMIN_KEY             ?= ${HOME}/.ssh/vm_lime
-export ADMIN_HOST            ?= a0
-#export ADMIN_TARGET_LIST     ?= ${K8S_NODES_CONTROL} ${K8S_NODES_WORKER}
-export ADMIN_TARGET_LIST     ?= ${K8S_NODES_CONTROL}
-export ADMIN_SRC_DIR         ?= $(shell pwd)
-#export ADMIN_DST_DIR         ?= ${ADMIN_SRC_DIR}
-export ADMIN_DST_DIR         ?= /tmp/$(shell basename "${ADMIN_SRC_DIR}")
-
-export ADMIN_JOURNAL_SINCE   ?= 15 minute ago
-export ADMIN_K8S_LOG_SINCE   ?= 3600s
-export ADMIN_PODS_PRUNE      ?= StatusUnk Error CrashLoopBackOff
-
-export ANSIBASH_TARGET_LIST  ?= ${ADMIN_TARGET_LIST}
-export ANSIBASH_USER         ?= ${ADMIN_USER}
-
-
-##############################################################################
 ## Recipes : Meta
 
 menu :
@@ -188,7 +57,7 @@ menu :
 	@echo "  -log       : Recently DROPped packets : journalctl --since='${ADMIN_JOURNAL_SINCE}' |grep DROP"
 	$(INFO) "🚀  3. Initialize the K8s cluster"
 	@echo "init         : Create 1st control node of the cluster"
-	@echo "  -purge     : Purge Makefile.settings of stale PKI params"
+	@echo "  -purge     : Purge Makefile.bootstrap.settings of stale PKI params"
 	@echo "  -gen       : Generate ${K8S_KUBEADM_CONF_INIT} from template (.yaml.tpl)"
 	@echo "  -push      : Upload ${K8S_KUBEADM_CONF_INIT} to all nodes"
 	@echo "  -images    : kubeadm config images pull …"

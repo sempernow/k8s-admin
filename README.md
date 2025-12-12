@@ -24,7 +24,7 @@ make install
 make reboot
 # Initialize cluster ( 1st node)
 make init
-vi Makefile.settings # Set K8S_CERTIFICATE_KEY
+vi Makefile.bootstrap.settings # Set K8S_CERTIFICATE_KEY
 # Configure client on this admin host
 make kubeconfig
 # Install Pod network (CNI addon)
