@@ -196,7 +196,7 @@ health(){
     echo 'ℹ️  Cluster Nodes : Upstream of External LB'
     printf "%s\n" ${K8S_NODES_CONTROL} |
         xargs -IX /bin/bash -c '
-            printf "%s\n" "curl -ksS https://$1.${HALB_DOMAIN}:6443/$ep"
+            printf "%s\n" "curl -ksS https://$1.${HALB_DOMAIN}:6443/$0"
             curl -fksS https://$1.${HALB_DOMAIN}:6443/$0 || echo "❌ ERR : $?"
             echo
         ' $ep X

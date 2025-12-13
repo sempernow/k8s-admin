@@ -545,7 +545,7 @@ version :
 	    && curl -fksS https://${K8S_FQDN}:8443/version |jq . \
 	    || curl -fksS https://${K8S_CONTROL_ENTRYPOINT}/version \
 	    || echo "ERR : $$?"
-health :
+health ready healthz readyz :
 	@bash make.recipes.sh health
 events :
 	kubectl get events -A --sort-by=.lastTimestamp |tail -n 50
