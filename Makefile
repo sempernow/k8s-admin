@@ -122,6 +122,7 @@ menu :
 	@echo "teardown     : kubeadm reset and cleanup at target node(s)"
 	$(INFO) "🔍  Inspect : Hosts"
 	@echo "status       : Print targets' status"
+	@echo "ausearch     : All recent denied"
 	@echo "sealert      : sealert -l '*'"
 	@echo "net          : Interfaces' info"
 	@echo "ruleset      : nftables rulesets"
@@ -222,6 +223,9 @@ status hello :
 	    && printf "%12s: %s\n" Kernel $$(uname -r) \
 	    && printf "%12s:%s\n" uptime "$$(uptime)" \
 	'
+ausearch :
+	ansibash sudo ausearch -m AVC,USER_AVC,SELINUX_ERR,USER_SELINUX_ERR -ts recent \
+	  |tee ${ADMIN_SRC_DIR}/logs/${LOG_PRE}.ausearch.${UTC}.log
 sealert :
 	ansibash 'sudo sealert -l "*" |grep -e == -e "Source Path" -e "Last Seen" |grep -v 2024 |grep -B1 -e == -e "Last Seen"'
 net :
