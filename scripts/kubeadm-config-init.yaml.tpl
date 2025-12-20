@@ -78,6 +78,7 @@ networking:
   ## Pod subnet CIDR      : Default is 10.244.0.0/16
   podSubnet: "$K8S_POD_CIDR"
 # scheduler: {}
+apiVersion: kubeadm.k8s.io/v1beta4
 ---
 apiVersion: kubelet.config.k8s.io/v1beta1
 kind: KubeletConfiguration

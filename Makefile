@@ -35,6 +35,7 @@ menu :
 	@echo "upgrade      : dnf upgrade all targets"
 	@echo "conf         : kernel selinux swap : See scripts/configure-*"
 	@echo "  -kernel    : Configure kernel for K8s/CNI/CRI : load modules and set runtime params"
+	@echo "  -dns       : Configure local DNS resolution"
 	@echo "  -selinux   : Configure targets' SELinux"
 	@echo "  -swap      : Configure targets' swap : Disable all swap devices"
 	@echo "install      : Install K8s and all deps"
@@ -275,11 +276,15 @@ conf-sudoer :
 	bash make.recipes.sh sudoer \
 	    |tee ${ADMIN_SRC_DIR}/logs/${LOG_PRE}.conf-sudoer.${UTC}.log
 
-conf : conf-kernel conf-selinux conf-swap reboot
+conf : conf-kernel conf-dns conf-selinux conf-swap reboot
 conf-kernel :
 	ansibash -u ${ADMIN_SRC_DIR}/scripts/configure-kernel.sh
 	ansibash 'sudo bash configure-kernel.sh || echo "⚠️  ERR : $$?"' \
 	    |tee ${ADMIN_SRC_DIR}/logs/${LOG_PRE}.conf-kernel.${UTC}.log
+conf-dns :
+	@ansibash -u ${ADMIN_SRC_DIR}/scripts/configure-dns.sh
+	@ansibash 'sudo bash configure-dns.sh || echo "⚠️  ERR : $$?"' \
+	    |tee ${ADMIN_SRC_DIR}/logs/${LOG_PRE}.conf-dns.${UTC}.log
 conf-selinux :
 	ansibash -u ${ADMIN_SRC_DIR}/scripts/configure-selinux.sh
 	ansibash 'sudo bash configure-selinux.sh enforcing || echo "⚠️  ERR : $$?"' \
@@ -359,7 +364,7 @@ fw-zone fw-zones :
 	ansibash 'sudo firewall-cmd --get-active-zones'
 	ansibash 'sudo firewall-cmd --get-default-zone'
 fw-log fw-logs :
-	ansibash "sudo journalctl --since='${ADMIN_JOURNAL_SINCE}' |grep DROP;echo All recent DROP logs from \'${ADMIN_JOURNAL_SINCE}\' until $$(date -Is)"
+	@ansibash "sudo journalctl --since='${ADMIN_JOURNAL_SINCE}' |grep DROP;echo All recent DROP logs from \'${ADMIN_JOURNAL_SINCE}\' until $$(date -Is)"
 
 init-imperative :
 	ssh -t ${ADMIN_USER}@${K8S_NODE_INIT} \
