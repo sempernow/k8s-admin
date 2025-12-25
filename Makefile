@@ -126,6 +126,7 @@ menu :
 	@echo "ausearch     : All recent denied"
 	@echo "sealert      : sealert -l '*'"
 	@echo "net          : Interfaces' info"
+	@echo "vip          : Reveal vIP host by listing all IPv4 attached to ${HALB_DEVICE} of each host"
 	@echo "ruleset      : nftables rulesets"
 	@echo "iptables     : iptables"
 	@echo "ipvs         : List the IPVS table"
@@ -234,6 +235,8 @@ net :
 	    sudo nmcli dev status; \
 	    ip -brief addr; \
 	'
+vip :
+	ansibash ip -4 -brief addr show dev ${HALB_DEVICE}
 ruleset :
 	ansibash sudo nft list ruleset
 iptables :
