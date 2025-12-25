@@ -125,6 +125,6 @@ export ADMIN_JOURNAL_SINCE   ?= 15 minute ago
 export ADMIN_K8S_LOG_SINCE   ?= 3600s
 export ADMIN_PODS_PRUNE      ?= StatusUnk Error CrashLoopBackOff
 
-export ANSIBASH_TARGET_LIST  ?= ${ADMIN_TARGET_LIST}
+export ANSIBASH_TARGET_LIST  := ${ADMIN_TARGET_LIST}
 export ANSIBASH_USER         ?= ${ADMIN_USER}
 
