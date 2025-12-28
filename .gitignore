@@ -3,4 +3,6 @@
 **/*.html
 **/*.tgz
 **/*.key
+**/*.cdx.*
+**/*.sbom.*
 scripts/kubeadm*.yaml
