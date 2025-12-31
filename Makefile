@@ -178,6 +178,7 @@ menu :
 	@echo "eol          : Fix line endings : Convert all CRLF to LF"
 	@echo "html         : Process all markdown (MD) to HTML"
 	@echo "commit       : Commit and push this source"
+	@echo "bundle       : Create ${PRJ_ROOT}.bundle"
 
 env :
 	$(INFO) 'Environment'
@@ -202,7 +203,8 @@ html :
 	find . -type f ! -path './.git/*' -name '*.md' -exec md2html.exe "{}" \;
 commit push : html mode
 	gc && git push && gl && gs
-
+bundle :
+	git bundle create ${PRJ_ROOT}.bundle --all
 
 ##############################################################################
 ## Recipes : Cluster
