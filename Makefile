@@ -68,6 +68,7 @@ menu :
 	@echo "  -now       : kubeadm init … : at 1st node (${ADMIN_USER}@${K8S_NODE_INIT})"
 	$(INFO) "🚧  4. Configure K8s API clients at local host ($(shell hostname))"
 	@echo "kubeconfig   : See ~/.kube/config, else set KUBECONFIG"
+	@echo "super-admin  : Generate and install super-admin.conf (once)."
 	$(INFO) "🚧  5. Install (one) CNI Add-on to provision the cluster's Pod Network"
 	@echo "cilium       : Install Cilium"
 	@echo "calico       : Install Calico"
@@ -144,6 +145,7 @@ menu :
 	@echo "nodes        : K8s Node(s) status"
 	@echo "pods         : kubectl get pods -A -o wide -w"
 	@echo "podcidr      : PodCIDR and per node"
+	@echo "certs-check  : kubeadm certs check-expiration"
 	$(INFO) "🧪  Test"
 	@echo "uniq         : K8s requires each node have a unique hostname, product ID, and network device MAC"
 	@echo "iostat       : Disk I/O : See '*_await' (req/resp latency [ms]) and '%util'(ization)"
@@ -430,6 +432,12 @@ static-start :
 kubeconfig :
 	bash make.recipes.sh kubeconfig
 
+super-admin :
+	ansibash -u ${ADMIN_SRC_DIR}/scripts/super-admin.conf.sh
+	ansibash sudo bash super-admin.conf.sh
+	
+#ansibash 'sudo bash super-admin.conf.sh || echo "⚠️  ERR : $$?"'
+
 ## init-certs is RUN ONLY IF the (bootstrap) certificate KEY HAS EXPIRED.
 ## Run prior to running the join-control recipe (only if key has expired).
 init-certs :
@@ -462,6 +470,10 @@ join-command :
 	    sudo kubeadm token create --print-join-command \
 	        --certificate-key ${K8S_CERTIFICATE_KEY} \
 	        |tee ${ADMIN_SRC_DIR}/logs/${LOG_PRE}.print-join-command.${UTC}.log
+
+certs-check :
+	ansibash sudo kubeadm certs check-expiration \
+	    |tee ${ADMIN_SRC_DIR}/logs/${LOG_PRE}.certs-check.${UTC}.log
 
 ## _install [replace_kube_proxy|pod_ntwk_only] : Default is replace else pod on fail
 kuberouter kuberouter-install :
