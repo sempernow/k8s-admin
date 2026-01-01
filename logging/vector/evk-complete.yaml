@@ -1,0 +1,366 @@
+---
+# Complete Elasticsearch + Vector + Kibana Stack
+# NO per-application configuration required
+# Automatically captures ALL container logs from ALL pods
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: logging
+---
+# Elasticsearch Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch
+  namespace: logging
+  labels:
+    app: elasticsearch
+spec:
+  ports:
+  - port: 9200
+    name: rest
+    targetPort: 9200
+  - port: 9300
+    name: inter-node
+    targetPort: 9300
+  clusterIP: None
+  selector:
+    app: elasticsearch
+---
+# Elasticsearch StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: elasticsearch
+  namespace: logging
+spec:
+  serviceName: elasticsearch
+  replicas: 1
+  selector:
+    matchLabels:
+      app: elasticsearch
+  template:
+    metadata:
+      labels:
+        app: elasticsearch
+    spec:
+      initContainers:
+      - name: fix-permissions
+        image: busybox:1.36
+        command: ['sh', '-c', 'chown -R 1000:1000 /usr/share/elasticsearch/data']
+        securityContext:
+          privileged: true
+        volumeMounts:
+        - name: data
+          mountPath: /usr/share/elasticsearch/data
+      - name: increase-vm-max-map
+        image: busybox:1.36
+        command: ['sysctl', '-w', 'vm.max_map_count=262144']
+        securityContext:
+          privileged: true
+      - name: increase-fd-ulimit
+        image: busybox:1.36
+        command: ['sh', '-c', 'ulimit -n 65536']
+        securityContext:
+          privileged: true
+      containers:
+      - name: elasticsearch
+        image: docker.elastic.co/elasticsearch/elasticsearch:8.11.3
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+          requests:
+            cpu: 500m
+            memory: 1Gi
+        ports:
+        - containerPort: 9200
+          name: rest
+          protocol: TCP
+        - containerPort: 9300
+          name: inter-node
+          protocol: TCP
+        env:
+        - name: cluster.name
+          value: k8s-logs
+        - name: node.name
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: discovery.type
+          value: single-node
+        - name: ES_JAVA_OPTS
+          value: "-Xms1g -Xmx1g"
+        - name: xpack.security.enabled
+          value: "false"
+        - name: xpack.security.enrollment.enabled
+          value: "false"
+        volumeMounts:
+        - name: data
+          mountPath: /usr/share/elasticsearch/data
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+      labels:
+        app: elasticsearch
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 10Gi
+---
+# Kibana Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: kibana
+  namespace: logging
+  labels:
+    app: kibana
+spec:
+  type: NodePort
+  ports:
+  - port: 5601
+    targetPort: 5601
+    nodePort: 30561
+    name: http
+  selector:
+    app: kibana
+---
+# Kibana Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kibana
+  namespace: logging
+  labels:
+    app: kibana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kibana
+  template:
+    metadata:
+      labels:
+        app: kibana
+    spec:
+      containers:
+      - name: kibana
+        image: docker.elastic.co/kibana/kibana:8.11.3
+        resources:
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+          requests:
+            cpu: 500m
+            memory: 512Mi
+        env:
+        - name: ELASTICSEARCH_URL
+          value: http://elasticsearch:9200
+        - name: ELASTICSEARCH_HOSTS
+          value: http://elasticsearch:9200
+        ports:
+        - containerPort: 5601
+          name: http
+---
+# Vector ServiceAccount
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: vector
+  namespace: logging
+---
+# Vector ClusterRole - needs to read pod metadata
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: vector
+rules:
+- apiGroups: [""]
+  resources:
+  - namespaces
+  - nodes
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+---
+# Vector ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: vector
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: vector
+subjects:
+- kind: ServiceAccount
+  name: vector
+  namespace: logging
+---
+# Vector ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vector-config
+  namespace: logging
+data:
+  vector.toml: |
+    # Vector configuration for Kubernetes log collection
+    # Data directory for Vector's state
+    data_dir = "/vector-data-dir"
+
+    # Source: Kubernetes logs from ALL containers
+    [sources.kubernetes_logs]
+      type = "kubernetes_logs"
+      # Automatically discovers and tails all container logs
+      auto_partial_merge = true
+      exclude_paths_glob_patterns = []
+      extra_field_selector = ""
+      extra_label_selector = ""
+      max_read_bytes = 2048
+      max_line_bytes = 32768
+
+    # Transform: Parse container logs and enrich with metadata
+    [transforms.parse_logs]
+      type = "remap"
+      inputs = ["kubernetes_logs"]
+      source = '''
+        # Parse JSON logs if possible, otherwise keep as plain text
+        if is_string(.message) {
+          parsed, err = parse_json(.message)
+          if err == null {
+            ., err = merge(., parsed)
+          }
+        }
+
+        # Ensure @timestamp exists (Elasticsearch standard)
+        # Rename .timestamp to .@timestamp if it exists
+        if exists(.timestamp) && !exists(."@timestamp") {
+          ts = .timestamp
+          . = set!(., ["@timestamp"], ts)
+        }
+
+        # If neither exists, create @timestamp
+        if !exists(."@timestamp") {
+          . = set!(., ["@timestamp"], now())
+        }
+
+        # Add useful fields
+        .cluster = "lime"
+        .log_type = "container"
+      '''
+
+    # Sink: Send to Elasticsearch
+    [sinks.elasticsearch]
+      type = "elasticsearch"
+      inputs = ["parse_logs"]
+      endpoints = ["http://elasticsearch.logging.svc.cluster.local:9200"]
+
+      # Index naming: logs-YYYY.MM.DD
+      bulk.index = "logs-%Y.%m.%d"
+
+      # Compression for efficiency
+      compression = "gzip"
+
+      # Healthcheck
+      healthcheck.enabled = true
+
+      # Batch settings for performance
+      batch.max_bytes = 10485760
+      batch.max_events = 1000
+      batch.timeout_secs = 5
+
+      # Buffer settings
+      buffer.type = "disk"
+      buffer.max_size = 268435488
+
+      # Request settings
+      request.timeout_secs = 60
+      request.retry_attempts = 5
+      request.retry_initial_backoff_secs = 1
+      request.retry_max_duration_secs = 300
+
+    # Sink: Console output for debugging (optional - can remove in production)
+    # [sinks.console]
+    #   type = "console"
+    #   inputs = ["parse_logs"]
+    #   encoding.codec = "json"
+---
+# Vector DaemonSet - runs on every node
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: vector
+  namespace: logging
+  labels:
+    app: vector
+spec:
+  selector:
+    matchLabels:
+      app: vector
+  template:
+    metadata:
+      labels:
+        app: vector
+    spec:
+      serviceAccountName: vector
+      tolerations:
+      # Run on all nodes including control plane
+      - effect: NoSchedule
+        operator: Exists
+      containers:
+      - name: vector
+        image: timberio/vector:0.35.0-distroless-libc
+        args:
+        - --config-dir
+        - /etc/vector/
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+        volumeMounts:
+        - name: config
+          mountPath: /etc/vector
+          readOnly: true
+        - name: data
+          mountPath: /vector-data-dir
+        - name: var-log
+          mountPath: /var/log
+          readOnly: true
+        - name: var-lib
+          mountPath: /var/lib
+          readOnly: true
+        env:
+        - name: VECTOR_SELF_NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: VECTOR_SELF_POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: VECTOR_SELF_POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+      terminationGracePeriodSeconds: 60
+      volumes:
+      - name: config
+        configMap:
+          name: vector-config
+      - name: data
+        emptyDir: {}
+      - name: var-log
+        hostPath:
+          path: /var/log
+      - name: var-lib
+        hostPath:
+          path: /var/lib

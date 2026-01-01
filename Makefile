@@ -113,11 +113,15 @@ menu :
 	@echo "  -access    : Forward Grafana port for local access (Remove: pkill kubectl)"
 	@echo "  -delete    : Delete the running release"
 	$(INFO) "🚧  Cluster-level Logging"
-	@echo "efk-apply    : Install EFK stack"
-	@echo "efk-delete   : Teardown EFK stack"
-	@echo "efk-verify   : GET request to Kibana"
-	@echo "loki-install : Install Grafana Loki chart"
-	@echo "loki-delete  : Uninstall Grafana Loki chart"
+	@echo "vector-install : ✅ Install Vector + Elasticsearch + Kibana (RECOMMENDED: zero per-app config)"
+	@echo "vector-status  : Check Vector logging stack status"
+	@echo "vector-logs    : View Vector collector logs"
+	@echo "vector-delete  : Uninstall Vector logging stack"
+	@echo "efk-apply      : Install EFK stack (requires per-app parsers)"
+	@echo "efk-delete     : Teardown EFK stack"
+	@echo "efk-verify     : GET request to Kibana"
+	@echo "loki-install   : Install Grafana Loki chart"
+	@echo "loki-delete    : Uninstall Grafana Loki chart"
 	$(INFO) "🚧  Security"
 	@echo "trivy        : Install Trivy Operator by Helm"
 	$(INFO) "⚠️  Cluster Teardown"
@@ -134,6 +138,7 @@ menu :
 	@echo "psk          : ps of K8s processes"
 	@echo "psrss        : ps sorted by RSS usage"
 	@echo "pscpu        : ps sorted by CPU usage"
+	@echo "df           : df -hT"
 	$(INFO) "🔍  Inspect : K8s API"
 	@echo "journal      : kubelet logs … --since='${ADMIN_JOURNAL_SINCE}' (per node)"
 	@echo "version      : GET /version"
@@ -195,7 +200,7 @@ eol :
 	find . -type f ! -path '*/.git/*' -exec dos2unix {} \+
 mode :
 	find . -type d ! -path './.git/*' -exec chmod 755 "{}" \;
-	find . -type f ! -path './.git/*' -exec chmod 660 "{}" \;
+	find . -type f ! -path './.git/*' -exec chmod 640 "{}" \;
 #	find . -type f ! -path './.git/*' -iname '*.sh' -exec chmod 755 "{}" \;
 tree :
 	tree -d |tee tree-d
@@ -255,6 +260,8 @@ psrss :
 	ansibash -s scripts/psrss.sh
 pscpu :
 	ansibash -s scripts/pscpu.sh
+df :
+	ansibash df -hT |grep -e == -e File -e xfs -e nfs
 
 podcidr :
 	kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.podCIDR}{"\n"}{end}'
@@ -747,6 +754,34 @@ loki-install :
 	bash ${ADMIN_SRC_DIR}/${loki} upgrade
 loki-delete :
 	bash ${ADMIN_SRC_DIR}/${loki} uninstall
+
+vector := logging/vector/evk-complete.yaml
+vector-install vector-apply :
+	$(INFO) 'Installing Elasticsearch + Vector + Kibana logging stack'
+	kubectl apply -f ${ADMIN_SRC_DIR}/${vector}
+	@echo "Waiting for Elasticsearch to be ready (may take 2-3 minutes)..."
+	kubectl wait --for=condition=ready pod -l app=elasticsearch -n logging --timeout=300s || true
+	@echo "Waiting for Kibana to be ready..."
+	kubectl wait --for=condition=ready pod -l app=kibana -n logging --timeout=300s || true
+	@echo "Waiting for Vector DaemonSet to be ready..."
+	kubectl rollout status daemonset/vector -n logging --timeout=180s || true
+	$(INFO) 'Vector logging stack deployed successfully'
+	@echo "Kibana available at: http://NODE_IP:30561"
+	@echo "See logging/vector/DEPLOY-VECTOR.md for setup instructions"
+vector-status :
+	$(INFO) 'Vector logging stack status'
+	kubectl get pods,svc -n logging
+	@echo ""
+	@echo "Elasticsearch indices:"
+	kubectl exec -n logging elasticsearch-0 -- curl -s 'http://localhost:9200/_cat/indices?v' 2>/dev/null || echo "Elasticsearch not ready yet"
+vector-logs :
+	$(INFO) 'Recent Vector logs'
+	kubectl logs -n logging daemonset/vector --tail=100
+vector-delete vector-uninstall :
+	$(INFO) 'Removing Vector logging stack'
+	kubectl delete -f ${ADMIN_SRC_DIR}/${vector} || true
+	kubectl delete pvc -n logging --all || true
+	$(INFO) 'Vector logging stack removed'
 
 kps :=observability/metrics/prometheus-grafana/kps/stack.sh
 prom-install prom-apply :
