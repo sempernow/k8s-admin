@@ -241,18 +241,22 @@ _etcdctl(){
 }
 export -f _etcdctl 
 export eps="https://a1:2379,https://a2:2379,https://a3:2379"
-# --endpoints=https://127.0.0.1:2379
+## --endpoints=https://127.0.0.1:2379
 
 _etcdctl --endpoints="$eps" endpoint status -w table
 
-# Verify all endpoints are healthy
+## Verify all endpoints are healthy
 _etcdctl --endpoints="$eps" endpoint health -w table
 
-# Verify all voters present (and usually not learners)
-_etcdctl --endpoints="$EPS" member list -w table
+## Verify all voters present (and usually not learners)
+_etcdctl --endpoints="$eps" member list -w table
 
-# IF this node is LEADER, then transfer lead to another
-LEADER_EP="https://a1:2379"   # replace with the leader you saw above
-TRANSFEREE_ID="1234567890abcdef"  # a healthy follower’s ID
+## Remove member by ID
+id=''
+_etcdctl --endpoints=https://127.0.0.1:2379 member remove $id 
 
+## Transfer lead to another member
+LEADER_EP="https://$leader:2379"    # Endpoint of the leader.
+TRANSFEREE_ID="1234567890abcdef"    # Member ID of the target; a healthy follower.
 _etcdctl --endpoints="$LEADER_EP" move-leader "$TRANSFEREE_ID"
+
