@@ -5,11 +5,11 @@
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
-  name: test-nfs-csi-secure-pvc
+  name: test-csi-nfs-secure-pvc
   labels:
     app: nfs-secure
 spec:
-  storageClassName: nfs-csi
+  #storageClassName: csi-nfs-archive
   accessModes:
     - ReadWriteOnce
   resources:
@@ -19,7 +19,7 @@ spec:
 apiVersion: v1
 kind: Pod
 metadata:
-  name: test-nfs-csi-secure-pod
+  name: test-csi-nfs-secure-pod
   labels:
     app: nfs-secure
 spec:
@@ -75,4 +75,4 @@ spec:
   volumes:
     - name: data
       persistentVolumeClaim:
-        claimName: test-nfs-csi-secure-pvc
+        claimName: test-csi-nfs-secure-pvc

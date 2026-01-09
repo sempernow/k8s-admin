@@ -6,7 +6,7 @@ metadata:
   name: csi-nfs-controller-sa
   namespace: kube-system
   labels:
-    app.kubernetes.io/instance: "nfs-csi"
+    app.kubernetes.io/instance: "csi-nfs"
     app.kubernetes.io/managed-by: "Helm"
     app.kubernetes.io/name: "csi-driver-nfs"
     app.kubernetes.io/version: "4.11.0"
@@ -19,7 +19,7 @@ metadata:
   name: csi-nfs-node-sa
   namespace: kube-system
   labels:
-    app.kubernetes.io/instance: "nfs-csi"
+    app.kubernetes.io/instance: "csi-nfs"
     app.kubernetes.io/managed-by: "Helm"
     app.kubernetes.io/name: "csi-driver-nfs"
     app.kubernetes.io/version: "4.11.0"
@@ -32,7 +32,7 @@ metadata:
   name: snapshot-controller
   namespace: kube-system
   labels:
-    app.kubernetes.io/instance: "nfs-csi"
+    app.kubernetes.io/instance: "csi-nfs"
     app.kubernetes.io/managed-by: "Helm"
     app.kubernetes.io/name: "csi-driver-nfs"
     app.kubernetes.io/version: "4.11.0"
@@ -42,9 +42,9 @@ metadata:
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: nfs-csi
+  name: csi-nfs-archive
   labels:
-    app.kubernetes.io/instance: "nfs-csi"
+    app.kubernetes.io/instance: "csi-nfs"
     app.kubernetes.io/managed-by: "Helm"
     app.kubernetes.io/name: "csi-driver-nfs"
     app.kubernetes.io/version: "4.11.0"
@@ -54,9 +54,10 @@ metadata:
 provisioner: nfs.csi.k8s.io
 parameters:
   mountPermissions: "0"
+  onDelete: archive
   server: a0.lime.lan
   share: /srv/nfs/k8s
-  subDir: /nfs-csi/${pv.metadata.name}/${pvc.metadata.namespace}/${pvc.metadata.name}
+  subDir: /csi-nfs-archive/${pvc.metadata.namespace}/${pv.metadata.name}/${pvc.metadata.name}
 reclaimPolicy: Delete
 volumeBindingMode: Immediate
 allowVolumeExpansion: true
@@ -914,7 +915,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: nfs-external-provisioner-role
   labels:
-    app.kubernetes.io/instance: "nfs-csi"
+    app.kubernetes.io/instance: "csi-nfs"
     app.kubernetes.io/managed-by: "Helm"
     app.kubernetes.io/name: "csi-driver-nfs"
     app.kubernetes.io/version: "4.11.0"
@@ -960,7 +961,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: nfs-external-resizer-role
   labels:
-    app.kubernetes.io/instance: "nfs-csi"
+    app.kubernetes.io/instance: "csi-nfs"
     app.kubernetes.io/managed-by: "Helm"
     app.kubernetes.io/name: "csi-driver-nfs"
     app.kubernetes.io/version: "4.11.0"
@@ -988,7 +989,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: snapshot-controller-runner
   labels:
-    app.kubernetes.io/instance: "nfs-csi"
+    app.kubernetes.io/instance: "csi-nfs"
     app.kubernetes.io/managed-by: "Helm"
     app.kubernetes.io/name: "csi-driver-nfs"
     app.kubernetes.io/version: "4.11.0"
@@ -1025,7 +1026,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: nfs-csi-resizer-role
   labels:
-    app.kubernetes.io/instance: "nfs-csi"
+    app.kubernetes.io/instance: "csi-nfs"
     app.kubernetes.io/managed-by: "Helm"
     app.kubernetes.io/name: "csi-driver-nfs"
     app.kubernetes.io/version: "4.11.0"
@@ -1045,7 +1046,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: nfs-csi-provisioner-binding
   labels:
-    app.kubernetes.io/instance: "nfs-csi"
+    app.kubernetes.io/instance: "csi-nfs"
     app.kubernetes.io/managed-by: "Helm"
     app.kubernetes.io/name: "csi-driver-nfs"
     app.kubernetes.io/version: "4.11.0"
@@ -1065,7 +1066,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: snapshot-controller-role
   labels:
-    app.kubernetes.io/instance: "nfs-csi"
+    app.kubernetes.io/instance: "csi-nfs"
     app.kubernetes.io/managed-by: "Helm"
     app.kubernetes.io/name: "csi-driver-nfs"
     app.kubernetes.io/version: "4.11.0"
@@ -1086,7 +1087,7 @@ metadata:
   name: snapshot-controller-leaderelection
   namespace: kube-system
   labels:
-    app.kubernetes.io/instance: "nfs-csi"
+    app.kubernetes.io/instance: "csi-nfs"
     app.kubernetes.io/managed-by: "Helm"
     app.kubernetes.io/name: "csi-driver-nfs"
     app.kubernetes.io/version: "4.11.0"
@@ -1103,7 +1104,7 @@ metadata:
   name: snapshot-controller-leaderelection
   namespace: kube-system
   labels:
-    app.kubernetes.io/instance: "nfs-csi"
+    app.kubernetes.io/instance: "csi-nfs"
     app.kubernetes.io/managed-by: "Helm"
     app.kubernetes.io/name: "csi-driver-nfs"
     app.kubernetes.io/version: "4.11.0"
@@ -1123,7 +1124,7 @@ metadata:
   name: csi-nfs-node
   namespace: kube-system
   labels:
-    app.kubernetes.io/instance: "nfs-csi"
+    app.kubernetes.io/instance: "csi-nfs"
     app.kubernetes.io/managed-by: "Helm"
     app.kubernetes.io/name: "csi-driver-nfs"
     app.kubernetes.io/version: "4.11.0"
@@ -1139,7 +1140,7 @@ spec:
   template:
     metadata:
       labels:
-        app.kubernetes.io/instance: "nfs-csi"
+        app.kubernetes.io/instance: "csi-nfs"
         app.kubernetes.io/managed-by: "Helm"
         app.kubernetes.io/name: "csi-driver-nfs"
         app.kubernetes.io/version: "4.11.0"
@@ -1286,7 +1287,7 @@ metadata:
   name: csi-nfs-controller
   namespace: kube-system
   labels:
-    app.kubernetes.io/instance: "nfs-csi"
+    app.kubernetes.io/instance: "csi-nfs"
     app.kubernetes.io/managed-by: "Helm"
     app.kubernetes.io/name: "csi-driver-nfs"
     app.kubernetes.io/version: "4.11.0"
@@ -1301,7 +1302,7 @@ spec:
   template:
     metadata:
       labels:
-        app.kubernetes.io/instance: "nfs-csi"
+        app.kubernetes.io/instance: "csi-nfs"
         app.kubernetes.io/managed-by: "Helm"
         app.kubernetes.io/name: "csi-driver-nfs"
         app.kubernetes.io/version: "4.11.0"
@@ -1503,7 +1504,7 @@ metadata:
   name: snapshot-controller
   namespace: kube-system
   labels:
-    app.kubernetes.io/instance: "nfs-csi"
+    app.kubernetes.io/instance: "csi-nfs"
     app.kubernetes.io/managed-by: "Helm"
     app.kubernetes.io/name: "csi-driver-nfs"
     app.kubernetes.io/version: "4.11.0"

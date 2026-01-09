@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+[[ $1 ]] || cat "$BASH_SOURCE"
 
 # Server
 export NFS_SERVER='a0.lime.lan'
@@ -9,7 +10,7 @@ repo=csi-driver-nfs
 url=https://raw.githubusercontent.com/kubernetes-csi/$repo/master/charts
 chart=csi-driver-nfs
 version=4.11.0
-release=nfs-csi
+release=csi-nfs
 ns=kube-system
 template=helm.template.yaml
 values=values.lime.yaml
@@ -54,10 +55,10 @@ values(){
     # Process the values template file into the values file 
     # used at template, install and uprade.
     envsubst < $values.tpl > $values
-    valuesDiff
+    diffValues
 }
 
-diffValues(){ diff $values values.yaml |grep -- '<'; }
+diffValues(){ diff values.yaml $values |grep -- '>'; }
 
 template(){
     # Generate manifest (YAML) file containing all K8s resources 
@@ -70,6 +71,7 @@ template(){
 }
 
 install(){
+    values
     helm upgrade $release $repo/$chart \
         --install \
         --namespace $ns \
@@ -78,6 +80,7 @@ install(){
 }
 
 installBySet(){
+    values
     helm upgrade $release $repo/$chart \
         --install \
         --namespace $ns \
@@ -93,12 +96,17 @@ manifest(){
 }
 
 diffManifest(){
-    # Running v. Declared states
-    diff helm.manifest.yaml helm.template.yaml #|grep -- '<'
+    # Declared (template) v. Running (manifest) states
+    diff helm.template.yaml helm.manifest.yaml #|grep -- '>'
+    echo
 }
 
 teardown(){
     helm delete $release --namespace $ns
+    ## If release name changed, may require delete of CRDs : Caution : big blast radius
+    #kubectl get crd |grep -i volume |cut -d' ' -f1 |xargs -n1 kubectl delete crd -A
 }
 
-"$@"
+pushd "${BASH_SOURCE%/*}" >/dev/null || pushd . || return 1
+"$@" || echo "ERR: $?"
+popd >/dev/null

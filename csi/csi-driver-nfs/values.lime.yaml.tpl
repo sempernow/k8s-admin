@@ -7,22 +7,24 @@ feature:
 controller:
   runOnControlPlane: true
   enableSnapshotter: true
-  defaultOnDeletePolicy: delete # Affects NFS subDir : delete or retain
+  defaultOnDeletePolicy: delete # Default behavior of StorageClass
 
 externalSnapshotter:
   enabled: true
 
 storageClass:
   create: true
-  name: nfs-csi
+  name: csi-nfs-archive
   annotations:
     storageclass.kubernetes.io/is-default-class: "true"
   parameters:
     server: $NFS_SERVER
     share: $NFS_EXPORT_PATH
-    subDir: /nfs-csi/${pv.metadata.name}/${pvc.metadata.namespace}/${pvc.metadata.name}
+    #subDir: /csi-nfs-archive/${pv.metadata.name}/${pvc.metadata.namespace}/${pvc.metadata.name}
+    subDir: /csi-nfs-archive/${pvc.metadata.namespace}/${pv.metadata.name}/${pvc.metadata.name}
     mountPermissions: "0"
-  reclaimPolicy: Delete # Affects PV only : Delete or Retain
+    onDelete: archive   # Affects physical storage on the nfs server : retain, archive, delete
+  reclaimPolicy: Delete # Affects PV only : Retain, Delete
   volumeBindingMode: Immediate
   mountOptions:
     - nfsvers=4.2

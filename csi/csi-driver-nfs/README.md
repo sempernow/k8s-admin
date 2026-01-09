@@ -14,14 +14,21 @@ Available `subDir` params:
 
 __Delete v. Retain__ behavior __on PVC delete__ 
 
+- `sc.reclaimPolicy` : Kubernetes StorageClass parameter
+- `sc.parameters.onDelete` : csi-nfs-driver parameter
+
 ```yaml
 controller:
   ...
-  defaultOnDeletePolicy: delete # Affects NFS subDir : delete or retain
-...
+  defaultOnDeletePolicy: delete # Default behavior of StorageClass 
+  ...
 storageClass:
   ...
-  reclaimPolicy: Delete # Affects PV only : Delete or Retain
+  parameters:
+    ...
+    onDelete: archive   # Affects physical storage on the nfs server : retain, archive, delete
+  reclaimPolicy: Delete # Affects PV only : Retain, Delete
+    ...
 ```
 - See [__`values.lime.yaml.yaml`__](values.lime.yaml.tpl)
 

@@ -17,12 +17,14 @@ See **[DEPLOY-VECTOR.md](DEPLOY-VECTOR.md)** for complete deployment guide.
 ### Why This Works (When Fluentd/Fluent-bit Failed)
 
 **Problem with Fluentd/Fluent-bit:**
+
 - Require hardcoded per-application log parsers (nginx, apache, etc.)
 - Only capture logs matching specific parser regex patterns
 - Miss all application logs that don't match configured parsers
 - This is why only Kubernetes core pod logs were visible
 
 **Vector Solution:**
+
 - Zero per-application configuration required
 - Automatically captures ALL container logs regardless of format
 - Intelligent JSON parsing with fallback to plain text
@@ -30,6 +32,7 @@ See **[DEPLOY-VECTOR.md](DEPLOY-VECTOR.md)** for complete deployment guide.
 - No hardcoded parsers needed
 
 **Files:**
+
 - `vector-efk-complete.yaml` - Complete working stack (Vector + ES + Kibana)
 - `DEPLOY-VECTOR.md` - Deployment guide and troubleshooting
 

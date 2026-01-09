@@ -2,11 +2,11 @@
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
-  name: test-nfs-csi-pvc
+  name: test-csi-nfs-pvc
   labels:
     app: nfs
 spec:
-  storageClassName: nfs-csi
+  #storageClassName: csi-nfs-archive
   accessModes:
     - ReadWriteMany
   resources:
@@ -16,7 +16,7 @@ spec:
 kind: Pod
 apiVersion: v1
 metadata:
-  name: test-nfs-csi-pod
+  name: test-csi-nfs-pod
   labels:
     app: nfs
 spec:
@@ -29,10 +29,10 @@ spec:
       - "-c"
       - "echo $(date -Is) : Hello from $(hostname -f);touch /mnt/$(id -un)@$(hostname -f)@$(date -u +'%Y-%m-%dT%H.%M.%SZ') && exit 0 || exit 1"
     volumeMounts:
-      - name: nfs-csi-pvc
+      - name: csi-nfs-pvc
         mountPath: "/mnt"
   restartPolicy: "Never"
   volumes:
-    - name: nfs-csi-pvc
+    - name: csi-nfs-pvc
       persistentVolumeClaim:
-        claimName: test-nfs-csi-pvc
+        claimName: test-csi-nfs-pvc

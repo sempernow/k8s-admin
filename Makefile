@@ -197,6 +197,7 @@ env :
 	@env |grep K8S_ |grep -v ADMIN |sort
 	@echo
 	@env |grep ADMIN_ |sort
+	@env |grep ANSIBASH_ |sort
 
 eol :
 	find . -type f ! -path '*/.git/*' -exec dos2unix {} \+
@@ -721,9 +722,13 @@ csi-nfs2-down :
 	pushd ${csi_nfs_dir} \
 	    && bash csi-driver-nfs.sh teardown
 csi-nfs2-test : 
-	kubectl apply -f ${csi_nfs_dir}/csi-driver-nfs-test.yaml 
+	kubectl create ns csi-test
+	kubectl apply -n csi-test -f ${csi_nfs_dir}/csi-driver-nfs-test.yaml 
+	kubectl apply -n csi-test -f ${csi_nfs_dir}/csi-driver-nfs-test-secure.yaml 
 csi-nfs2-test-down : 
-	kubectl delete -f ${csi_nfs_dir}/csi-driver-nfs-test.yaml 
+	kubectl delete -n csi-test -f ${csi_nfs_dir}/csi-driver-nfs-test.yaml 
+	kubectl delete -n csi-test -f ${csi_nfs_dir}/csi-driver-nfs-test-secure.yaml 
+	kubectl delete ns csi-test
 csi-nfs1 :
 	pushd csi/nfs-subdir-external-provisioner \
 	    && bash nfs-subdir-provisioner.sh
