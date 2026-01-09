@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-########################################
-# Configure kernel for local DNS
+#################################################
+# Configure host for local DNS resolution 
+# of its hostname to its public IPv4 address
+# for lower DNS latency and higher reliability.
 # - Idempotent
-########################################
+#################################################
 [[ "$(id -u)" -ne 0 ]] && {
     echo "⚠️  ERR : MUST run as root" >&2
 
@@ -19,14 +21,22 @@ ip4(){
 }
 export -f ip4
 
-## Add FQDN and shortname of host to its /etc/hosts file, if not there already.
-grep $(ip4) /etc/hosts && exit 0
+## Add this host's FQDN (and shortname if it differs) to its /etc/hosts file (once).
+grep $(ip4) /etc/hosts &&
+    exit 0
 
-type -t ip4 &&
-    echo "$(ip4) $(hostname -f) $(hostname -s)" |tee -a /etc/hosts &&
+fqdn="$(hostname -f)"
+short="$(hostname -s)"
+
+[[ $fqdn == $short ]] &&
+    resolve="$fqdn" ||
+        resolve="$fqdn $short"
+
+type -t ip4 > /dev/null 2>&1 &&
+    echo "$(ip4) $resolve" |tee -a /etc/hosts &&
         exit
 
-echo "⚠️  ERR : ${BASH_SOURCE##*/} REQUIREs function: ip4" >&2
+e=22; echo "⚠️  ERR : $e : ${BASH_SOURCE##*/} REQUIREs function: ip4" >&2
 
-exit 22
+exit $e
 
