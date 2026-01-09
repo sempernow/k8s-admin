@@ -89,7 +89,7 @@ ok(){
     ver='0.16.2' # Has no releases page!
     base="https://raw.githubusercontent.com/kubernetes/release/v${ver}/cmd/krel/templates/latest"
     bin=/usr/local/bin # Abide LFS conventions for binary (non-pkg) installs
-    sys=/usr/lib/systemd/system
+    sys=/etc/systemd/system
     [[ -d $sys/kubelet.service.d ]] && return 0
     sudo mkdir -p $sys/kubelet.service.d
     

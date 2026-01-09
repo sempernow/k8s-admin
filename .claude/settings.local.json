@@ -3,7 +3,9 @@
     "allow": [
       "Bash(kubectl exec -n logging deployment/kibana -- curl -X POST -s \"http://localhost:5601/api/data_views/data_view/a4c4e30e-9e48-44b6-86d5-5e44a7691ccd/fields\" -H \"kbn-xsrf: true\" -H \"Content-Type: application/json\" -d '{}')",
       "Bash(python3:*)",
-      "Bash(kubectl exec:*)"
+      "Bash(kubectl exec:*)",
+      "Bash(grep:*)"
     ]
-  }
+  },
+  "spinnerTipsEnabled": true
 }

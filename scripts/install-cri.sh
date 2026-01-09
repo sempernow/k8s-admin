@@ -151,7 +151,7 @@ ok || exit $?
 ok(){
     # Configure containerd as a systemd service else fail
     url=https://raw.githubusercontent.com/containerd/containerd/main/containerd.service
-    sys=/usr/lib/systemd/system
+    sys=/etc/systemd/system
     # [[ -f $sys/containerd.service ]] &&
     #     return 0
     disableContainerd
