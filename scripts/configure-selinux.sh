@@ -6,7 +6,7 @@
 # ARGs: [Enforcing|Permissive(Default)]
 ###########################################################
 [[ "$(id -u)" -ne 0 ]] && {
-    echo "⚠️  ERR : MUST run as root" >&2
+    echo "❌️  ERR : MUST run as root" >&2
 
     exit 11
 }

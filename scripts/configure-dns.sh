@@ -6,7 +6,7 @@
 # - Idempotent
 #################################################
 [[ "$(id -u)" -ne 0 ]] && {
-    echo "⚠️  ERR : MUST run as root" >&2
+    echo "❌  ERR : MUST run as root" >&2
 
     exit 11
 }
@@ -36,7 +36,7 @@ type -t ip4 > /dev/null 2>&1 &&
     echo "$(ip4) $resolve" |tee -a /etc/hosts &&
         exit
 
-e=22; echo "⚠️  ERR : $e : ${BASH_SOURCE##*/} REQUIREs function: ip4" >&2
+e=22; echo "❌️  ERR : $e : ${BASH_SOURCE##*/} REQUIREs function: ip4" >&2
 
 exit $e
 
