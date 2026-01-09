@@ -132,6 +132,8 @@ menu :
 	@echo "sealert      : sealert -l '*'"
 	@echo "net          : Interfaces' info"
 	@echo "vip          : Reveal vIP host by listing all IPv4 attached to ${HALB_DEVICE} of each host"
+	@echo "link         : L2"
+	@echo "route        : L3"
 	@echo "ruleset      : nftables rulesets"
 	@echo "iptables     : iptables"
 	@echo "ipvs         : List the IPVS table"
@@ -246,6 +248,10 @@ net :
 	'
 vip :
 	ansibash ip -4 -brief addr show dev ${HALB_DEVICE}
+link :
+	ansibash ip link 
+route :
+	ansibash ip route 
 ruleset :
 	ansibash sudo nft list ruleset
 iptables :
