@@ -50,6 +50,7 @@ ok(){
     # https://github.com/containerd/containerd/blob/main/docs/getting-started.md
     # https://github.com/containerd/containerd/releases
     # ver='2.0.0' # Breaking changes : See keys & version of /etc/containerd/config.toml
+    # Usage ctr vs. crictl : ctr -n k8s.io ...# Default namespace is not that of crictl.
     ver='1.7.24'
     #ver='2.1.3'
     arch=${ARCH:-amd64}
