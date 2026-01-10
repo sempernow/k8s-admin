@@ -1,6 +1,6 @@
 # [`k8s-admin`](https://github.com/sempernow/k8s-admin "GitHub : sempernow/k8s-admin") | [Kubernetes.io](https://kubernetes.io/docs/) | [Releases](https://github.com/kubernetes/kubernetes/releases)
 
-Install on-prem K8s cluster using `kubeadm`.
+Install on-prem Kubernetes (K8s) cluster using `kubeadm`.
 
 See project [`halb`](https://github.com/sempernow/halb "GitHub : sempernow/halb") for the external load balancer.
 

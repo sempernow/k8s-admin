@@ -7,9 +7,12 @@ It provided neither storage, indexing, nor querying/visualization components; __
 
 ### Evolution of the Logging Stack
 
-- **Old-school ELK** → Elasticsearch (storage + search) + Logstash (processing) + Kibana (UI)
-- **Common EFK** (especially in Kubernetes) → Elasticsearch + Fluentd/Fluent Bit + Kibana
-- **EVK** (very popular since ~2020–2025) → **E**lasticsearch / OpenSearch + **V**ector + **K**ibana
+- **Old-school ELK**  
+    → Elasticsearch (storage + search) + Logstash (processing) + Kibana (UI)
+- **Common EFK** (especially in Kubernetes)  
+    → Elasticsearch + Fluentd/Fluent Bit + Kibana
+- **EVK** (very popular since ~2020–2025)  
+    → **E**lasticsearch / OpenSearch + **V**ector + **K**ibana
 
 In the **EVK** stack, Vector typically replaces Logstash (or Fluentd/Fluent Bit) as the collector/processor/shipper because it's:
 
@@ -72,12 +75,14 @@ See **[DEPLOY-VECTOR.md](DEPLOY-VECTOR.md)** for complete deployment guide.
 ### Why This Works (When Fluentd/Fluent-bit Failed)
 
 **Problem with Fluentd/Fluent-bit:**
+
 - Require hardcoded per-application log parsers (nginx, apache, etc.)
 - Only capture logs matching specific parser regex patterns
 - Miss all application logs that don't match configured parsers
 - This is why only Kubernetes core pod logs were visible
 
 **Vector Solution:**
+
 - Zero per-application configuration required
 - Automatically captures ALL container logs regardless of format
 - Intelligent JSON parsing with fallback to plain text
@@ -85,6 +90,7 @@ See **[DEPLOY-VECTOR.md](DEPLOY-VECTOR.md)** for complete deployment guide.
 - No hardcoded parsers needed
 
 **Files:**
+
 - `evk-complete.yaml` - Complete working stack (ES + Vector + Kibana)
 - `DEPLOY-VECTOR.md` - Deployment guide and troubleshooting
 
@@ -99,6 +105,7 @@ Here are the most practical **EVK-style or modern alternatives** ranked for your
 This is currently the **most popular and battle-tested** choice for Kubernetes-centric, on-prem environments at your scale.
 
 **Why it fits best here**:
+
 - Extremely **low resource usage** → Loki indexes only labels (metadata), not full text → cheap storage and RAM (often 5-10× less than OpenSearch/Elasticsearch for similar retention).
 - HA is straightforward: Deploy Loki in **distributed mode** (multiple ingesters + queriers + a compactor) with replication factor 2-3 across your 5 nodes. Use object storage (MinIO on-prem, or NFS/S3-compatible) for chunks/index — very reliable and scales with your cluster.
 - Vector → Loki sink is native, efficient, and battle-tested.
@@ -107,36 +114,44 @@ This is currently the **most popular and battle-tested** choice for Kubernetes-c
 - Community feedback (2025-2026) shows many on-prem K8s teams running this successfully on similar small HA clusters (e.g., RKE2/Talos + Azure Blob/NFS equivalents).
 
 **Potential downsides**:
+
 - Full-text search is **label-first** → if you need very fast arbitrary keyword search without good label discipline (e.g., no trace_id/user_id as labels), it can require broader scans and feel slower than classic Elasticsearch.
 - High-cardinality labels (e.g., every request ID) can explode memory — enforce good label hygiene (limit to ~10-15 per stream).
 
 **Deployment tips**:
+
 - Use Grafana's official Loki Helm chart → enable microservices mode for HA.
 - Retention: Start with 7-30 days (easy to tune).
 - Resources: 1-2 CPU / 2-4GB RAM per Loki component (scale up if needed); Vector DaemonSet ~100-300MB RAM per node.
 
 ### 2. Solid & Familiar Alternative: **Vector + OpenSearch + OpenSearch Dashboards** (true EVK, fully open)
+
 If your team already knows Kibana/Elasticsearch syntax or you need strong **full-text search** (relevance ranking, complex analyzers, SIEM-like use cases), stick close to the classic model.
 
 **Pros**:
+
 - Excellent for **ad-hoc text search** across everything — no label restrictions.
 - Vector has direct Elasticsearch sink (fully compatible with OpenSearch).
 - HA via OpenSearch cluster (3+ master-eligible + data nodes) — fits your 5 nodes (co-locate with workloads carefully).
 - Dashboards are Kibana-like → familiar.
 
 **Cons**:
+
 - Higher resource usage (JVM heap, indexing overhead) → expect 4-8GB+ RAM per data node even at moderate scale.
 - More operational work (sharding, ILM policies, rebalancing).
 - Storage grows faster than Loki for raw logs.
 
 **When to choose**:
+
 - You have compliance/auditing needs requiring perfect full-text recall.
 - Developers demand "grep-like" search without label constraints.
 
 ### 3. Emerging Strong Contender: **Vector + VictoriaLogs + Grafana**
+
 VictoriaLogs (from VictoriaMetrics team) is gaining serious traction in 2025-2026 as a **Loki killer** for on-prem.
 
 **Key advantages** (from benchmarks & user reports):
+
 - Supports **high-cardinality fields** out-of-the-box (user_id, trace_id, IP — no explosions).
 - Much lower resource usage than Loki/OpenSearch (up to 10-30× less RAM/disk in some workloads).
 - Fast full-text search over all fields (not just labels).
@@ -145,11 +160,13 @@ VictoriaLogs (from VictoriaMetrics team) is gaining serious traction in 2025-202
 - Vector can send via Loki protocol or HTTP sink (compatible).
 
 **Current status**:
+
 - Very positive user reports for replacing Loki in K8s (faster queries, less resources, better compression).
 - Helm chart available.
 - Great if you want Loki-like simplicity but without cardinality pain or slow regex/text scans.
 
 **Trade-off**:
+
 - Smaller community than Loki (but growing fast).
 - Query language (LogsQL) is different but intuitive.
 
