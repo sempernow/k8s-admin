@@ -60,6 +60,7 @@ mountCIFS(){
     server=192.168.11.100
     share=/NTFS002share
     mnt=/mnt/100-ntfs002
+    ## Creds only if sec=sys : Utilizes legacy, insecure NTLMv2
     user=CIFS_SVC_ACCT_USERNAME
     pass=CIFS_SVC_ACCT_PASSWORD
 

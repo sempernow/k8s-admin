@@ -7,21 +7,20 @@
 The filesystem format (NTFS, FAT32, ...) is irrelevant.   
 The CIFS (SMB) protocol handles that.
 
-## "`san-cifs`" (server) : *SAN* (iSCSI/FCP LUNs) and *CIFS* (SMB)
+## NetApp export : "`san-cifs`" (server) 
+
+__SAN__ (iSCSI/FCP LUNs) and __CIFS__ (SMB)
 
 Note __LUNs__ are block-level logical storage volumes presented to servers 
-from a Storage Area Network (__SAN__). 
+from a **S**torage **A**rea **N**etwork (__SAN__). Hence `san-cifs` _reference_.
 
-__NetApp ONTAP protocols__:
+Available __NetApp ONTAP protocols__:
 
 - `nfs`
 - `cifs` (SMB)
 - `iscsi`
 - `fcp`
 - `nvme`
-
-So, NetApp ONTAP __administrators__ may *reference* the LUN of a SAN   
-that is shared by CIFS protocol as "__`san-cifs`__" .
 
 ## [`csi-driver-smb.sh`](csi-driver-smb.sh)
 
@@ -47,17 +46,14 @@ then the **right move is to access it via SMB/CIFS**, *not* NFS.
 
 You can mount the NetApp share using the **SMB (CIFS) protocol** just like a Windows client.
 
----
-
 ### 🔧 Step-by-Step: Access NetApp CIFS Share from RHEL
 
 ### 1. ✅ Install Required Tools
 
 ```bash
-sudo dnf install cifs-utils
+sudo dnf install cifs-utils krb5-workstation # 
 ```
-
----
+- The Kerberos pkg is required only if `mount -t cifs -o sec=krb5,...`
 
 ### 2. ✅ Create a Mount Point
 
@@ -65,9 +61,11 @@ sudo dnf install cifs-utils
 sudo mkdir -p /mnt/netapp-cifs
 ```
 
----
-
 ### 3. ✅ Mount the SMB Share
+
+#### If `sec=sys` (mount option)
+
+AuthN is by legacy NTLMv2
 
 ```bash
 sudo mount -t cifs //NETAPP_IP_OR_FQDN/sharename /mnt/netapp-cifs \
@@ -82,6 +80,159 @@ sudo mount -t cifs //192.168.11.100/NTFSshare /mnt/netapp-cifs \
 ```
 
 > ✅ **Recommended:** Use a dedicated service account (`svc_*`) with limited access on the NetApp SVM.
+
+#### If `sec=krb5` (mount option)
+
+AuthN is by Kerberos. 
+This requires node-level ticket management.
+
+
+##### Practical Architecture
+
+```text
+┌─────────────────────────────────────────────────────┐
+│  K8s Node                                           │
+│  ┌─────────────────┐    ┌────────────────────────┐  │
+│  │ DaemonSet       │    │ /etc/krb5.keytab.svc   │  │
+│  │ (kinit refresh) │───▶│ /tmp/krb5cc_svc        │  │
+│  └─────────────────┘    └───────────┬────────────┘  │
+│                                     │               │
+│  ┌─────────────────┐    ┌───────────▼────────────┐  │
+│  │ csi-driver-smb  │───▶│ mount.cifs sec=krb5    │  │
+│  │ (node plugin)   │    │ uses node ccache       │  │
+│  └─────────────────┘    └───────────┬────────────┘  │
+│                                     │               │
+│  ┌─────────────────┐                │               │
+│  │ PV-Consumer     │◀───────────────┘               │
+│  │ Pod             │   (mounted PV)                 │
+│  └─────────────────┘                                │
+└─────────────────────────────────────────────────────┘
+```
+
+
+##### Implementation
+
+**1. Keytab Secret**
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: krb5-keytab
+  namespace: kube-system
+type: Opaque
+data:
+  svc.keytab: <base64-encoded-keytab>
+```
+
+**2. DaemonSet for Ticket Refresh**
+
+```yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: krb5-ticket-refresher
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: krb5-ticket-refresher
+  template:
+    metadata:
+      labels:
+        app: krb5-ticket-refresher
+    spec:
+      hostPID: false
+      containers:
+        - name: kinit
+          image: registry.access.redhat.com/ubi8/ubi-minimal:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              dnf install -y krb5-workstation && \
+              cp /secrets/svc.keytab /host-keytab/svc.keytab && \
+              chmod 600 /host-keytab/svc.keytab && \
+              while true; do
+                kinit -k -t /host-keytab/svc.keytab svc_gitlab@YOURDOMAIN.COM -c /host-ccache/krb5cc_0
+                chmod 644 /host-ccache/krb5cc_0
+                sleep 14400  # 4 hours; adjust to ticket lifetime
+              done
+          volumeMounts:
+            - name: keytab-secret
+              mountPath: /secrets
+              readOnly: true
+            - name: host-keytab
+              mountPath: /host-keytab
+            - name: host-ccache
+              mountPath: /host-ccache
+          securityContext:
+            privileged: false
+            runAsUser: 0
+      volumes:
+        - name: keytab-secret
+          secret:
+            secretName: krb5-keytab
+        - name: host-keytab
+          hostPath:
+            path: /etc/krb5-gitlab
+            type: DirectoryOrCreate
+        - name: host-ccache
+          hostPath:
+            path: /tmp
+            type: Directory
+```
+
+**3. Configure `cifs.upcall` on Nodes**
+
+Nodes need `/etc/request-key.conf` or `/etc/request-key.d/cifs.spnego.conf` pointing to the right ccache. This typically requires node-level config (MachineConfig on OpenShift, or baked into your RHEL image):
+
+```
+create cifs.spnego * * /usr/sbin/cifs.upcall -k %k
+```
+
+And in __`/etc/krb5.conf`__:
+
+```ini
+[libdefaults]
+    default_ccache_name = FILE:/tmp/krb5cc_0
+```
+
+**4. PV with `sec=krb5`**
+
+```yaml
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: gitlab-runner-store
+spec:
+  capacity:
+    storage: 100Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  mountOptions:
+    - sec=krb5
+    - dir_mode=0775
+    - file_mode=0664
+  csi:
+    driver: smb.csi.k8s.io
+    volumeHandle: gitlab-runner-store
+    volumeAttributes:
+      source: //netapp-server.yourdomain.com/share
+```
+
+Note: no `nodeStageSecretRef` needed—auth comes from the node's credential cache.
+
+##### Caveats
+
+- Node-level state makes this less "pure" K8s but it's the only viable path with your constraints
+- The DaemonSet needs to start before any pod tries to mount
+- Ticket lifetime vs. refresh interval needs tuning
+- If nodes aren't domain-joined, DNS/Kerberos realm resolution must still work
+
+If OpenShift, then MachineConfig makes this the cleaner path for node-level `krb5.conf`
+
 
 ---
 

@@ -2,7 +2,7 @@
 
 Install on-prem Kubernetes (K8s) cluster using `kubeadm`.
 
-See project [`halb`](https://github.com/sempernow/halb "GitHub : sempernow/halb") for the external load balancer.
+See [`halb`](https://github.com/sempernow/halb "GitHub : sempernow/halb") for the _external load balancer_ (edge).
 
 ## Usage 
 
