@@ -17,6 +17,7 @@ prep(){
     template=helm.template
     ns=smb
 
+    # 1. Get the values file of this version
     [[ -f values.yaml ]] || {
         [[ -f $archive ]] || {
             echo "ℹ️ Pull the chart : $url"
@@ -33,8 +34,8 @@ prep(){
     # 2. Generate the K8s-resource manifests (helm template) from chart (local|remote)
     [[ -f helm.template.yaml ]] || {
         echo "ℹ️ Generate the chart-rendered K8s resources : helm template ..."
-        #helm -n $ns template $chart |tee $template.yaml            # Local chart
-        helm -n $ns template $url |tee $template.yaml  # Remote chart
+        #helm -n $ns template $chart |tee $template.yaml # Local chart
+        helm -n $ns template $url |tee $template.yaml # Remote chart
     }
     # 3. Extract a list of all images required to install the chart
     [[ -f helm.template.images ]] || {
