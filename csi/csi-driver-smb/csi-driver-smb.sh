@@ -8,30 +8,33 @@
 
 prep(){
     # 1. Pull the chart and extract values.yaml
+    chart=csi-driver-smb
+    ver=1.19.1
+    archive=${chart}-$ver.tgz
     base=https://github.com/kubernetes-csi/csi-driver-smb/raw/refs/heads/master/charts
-    ver=v1.9.0
-    chart=csi-driver-smb-$ver.tgz
-    release=csi-driver-smb
+    url=$base/v$ver/$archive
+    release=$chart
     template=helm.template
     ns=smb
+
     [[ -f values.yaml ]] || {
-        [[ -f $chart ]] || {
-            echo "ℹ️ Pull the chart : '$chart' from '$base/$ver/'"
-            wget $base/$ver/$chart ||
+        [[ -f $archive ]] || {
+            echo "ℹ️ Pull the chart : $url"
+            wget $url ||
                 echo "❌ ERR : $?"
         }
         echo "ℹ️ Extract values file"
         # Extract values.yaml to PWD
-        tar -xaf $chart $release/values.yaml &&
-            mv $release/values.yaml . &&
-                rm -rf $release ||
+        tar -xaf $archive $release/values.yaml &&
+            mv $chart/values.yaml . &&
+                rm -rf $chart ||
                     echo "⚠️ values.yaml is *not* extracted."
     }
     # 2. Generate the K8s-resource manifests (helm template) from chart (local|remote)
     [[ -f helm.template.yaml ]] || {
         echo "ℹ️ Generate the chart-rendered K8s resources : helm template ..."
         #helm -n $ns template $chart |tee $template.yaml            # Local chart
-        helm -n $ns template $base/$ver/$chart |tee $template.yaml  # Remote chart
+        helm -n $ns template $url |tee $template.yaml  # Remote chart
     }
     # 3. Extract a list of all images required to install the chart
     [[ -f helm.template.images ]] || {
