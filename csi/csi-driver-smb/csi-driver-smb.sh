@@ -55,32 +55,84 @@ setCreds(){
     [[ $3 ]] || echo "  USAGE: $FUNCNAME user pass realm 2>&"
     [[ $3 ]] || return 1
     
-	mkdir -p /etc/cifs || return 2
-	tee /etc/cifs/svc-smb-rw.creds <<-EOH
+	tee /etc/$1.creds <<-EOH
 	username=$1
 	password=$2
 	domain=$3
 	EOH
-      chmod 600 /etc/cifs/svc-smb-rw.creds
+    chmod 600 /etc/$1.creds
 }
+keytabInstall(){
+    [[ "$(id -u)" -ne 0 ]] && return 1
+    [[ $1 ]] || return 1
+    cp ${1}.keytab /etc/${1}.keytab
+    chown $1: /etc/${1}.keytab
+    chmod 600 /etc/${1}.keytab
+}
+krbTktSetup(){
+    [[ "$(id -u)" -ne 0 ]] && return 1
+    [[ $1 ]] || return 2
+
+    systemctl disable --now ${1}-kinit.timer
+    sleep 2
+
+    # Service is static : Do NOT enable
+	tee /etc/systemd/system/${1}-kinit.service <<-EOH
+	# /etc/systemd/system/${1}-kinit.service
+	[Unit]
+	Description=Renew Kerberos ticket for ${1}
+	After=network-online.target
+
+	[Service]
+	Type=oneshot
+	User=${1}
+	ExecStart=/usr/bin/kinit -k -t /etc/${1}.keytab ${1}@LIME.LAN
+	EOH
+
+    # Timer : Enable
+	tee /etc/systemd/system/${1}-kinit.timer <<-EOH
+	# /etc/systemd/system/${1}-kinit.timer 
+	[Unit]
+	Description=Renew Kerberos ticket every 4 hours
+
+	[Timer]
+	OnBootSec=1min
+	OnUnitActiveSec=4h
+
+	[Install]
+	WantedBy=timers.target
+	EOH
+    
+    systemctl daemon-reload
+    systemctl enable --now ${1}-kinit.timer
+}
+krbTktStatus(){
+    [[ $1 ]] || return 1
+
+    # Check timer is active and scheduled
+    systemctl status ${1}-kinit.timer
+
+    # Check last service run
+    systemctl status ${1}-kinit.service --no-pager --full
+
+    # Verify ticket exists
+    sudo -u $1 klist
+}
+
 mountCIFS(){ 
     [[ "$(id -u)" -ne 0 ]] && return 1
-    mode=${1:-service} # service|group|unmount
-
-    # 1. Install CIFS (SMB) utilities
-    dnf list installed cifs-utils ||
-        dnf -y install cifs-utils ||
-            return 2
-    
+    [[ $1 ]] || return 2
+    svc=$1
+    mode=${2:-service} # service|group|unmount
+   
     # 2. Mount a Windows SMB share (regardless of its local filesystem format)
     realm=LIME
     server=dc1.lime.lan
     share=SMBdata
     mnt=/mnt/smb-data-01
-    svc=svc-smb-rw
     ## Creds only if sec=ntlmssp 
-    creds=/etc/cifs/$svc.creds
-    mkdir -p $mnt || return 3
+    creds=/etc/$svc.creds
+    mkdir -p $mnt || return 4
     uid="$(id -u $svc)"
 
     [[ $mode == unmount ]] && {
@@ -93,16 +145,16 @@ mountCIFS(){
     gid="$(id -g svc-smb-rw)"
     [[ $mode == service ]] && {
         mount -t cifs //$server/$share $mnt \
-            -o sec=ntlmssp,credentials=$creds,vers=3.0,uid=$uid,gid=$gid,file_mode=0640,dir_mode=0775 ||
-                return 4
+            -o sec=ntlmssp,vers=3.0,credentials=$creds,uid=$uid,gid=$gid,file_mode=0640,dir_mode=0775 ||
+                return 5
     }
     
     # Allow R/W access by all members of AD Group 'ad-smb-admins'
     gid="$(getent group ad-smb-admins |cut -d: -f3)"
     [[ $mode == group ]] && {
         mount -t cifs //$server/$share $mnt \
-            -o sec=ntlmssp,credentials=$creds,vers=3.0,uid=$uid,gid=$gid,file_mode=0660,dir_mode=0775 ||
-                return 5
+            -o sec=ntlmssp,vers=3.0,credentials=$creds,uid=$uid,gid=$gid,file_mode=0660,dir_mode=0775 ||
+                return 6
     }
     
     return 0
@@ -110,18 +162,20 @@ mountCIFS(){
 
 mountCIFSkrb5(){
     [[ "$(id -u)" -ne 0 ]] && return 1
-    mode=${1:-service} # service|group|unmount
+    [[ $1 ]] || return 2
+    svc=$1
+    mode=${2:-service} # service|group|unmount
 
     realm=LIME
     server=dc1.lime.lan
     share=SMBdata
     mnt=/mnt/smb-data-01
-    svc=svc-smb-rw
     mkdir -p $mnt || return 3
     uid="$(id -u $svc)"
 
     [[ $mode == unmount ]] && {
         umount $mnt
+        ls -hl $mnt
         return $?
     }
     echo "ℹ️ Mount a CIFS share from RHEL host ($(hostname -f)) for '$mode' access using Kerberos for AuthN."
@@ -141,9 +195,20 @@ mountCIFSkrb5(){
             -o sec=krb5,vers=3.0,cruid=$uid,uid=$uid,gid=$gid,file_mode=0660,dir_mode=0775 ||
                 return 5
     }
+   
+    ls -hl $mnt
     
     return 0
 
+}
+verifyAccess(){
+    [[ $1 ]] || return 1
+    sudo -u $1 bash -c '
+        target=/mnt/smb-data-01/$(date -Id)-$(id -un)-at-$(hostname -f).txt
+        echo $(date -Is) : Hello from $(id -un) @ $(hostname -f) |tee -a $target
+        ls -hl $target 
+        cat $target 
+    '
 }
 
 [[ $1 ]] || {

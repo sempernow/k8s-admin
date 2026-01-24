@@ -735,7 +735,25 @@ csi-nfs1 :
 csi-nfs1-test : 
 	kubectl apply -f csi/nfs-subdir-external-provisioner/app.test-nfs.yaml 
 
-csi-smb : 
+smb_user := svc-smb-rw
+csi-smb-host : 
+	ansibash 'type klist || sudo dnf -y install cifs-utils krb5-workstation'
+	type -t agede && agede ${ADMIN_SRC_DIR}/csi/csi-driver-smb/${smb_user}.keytab.age \
+	  |tee ${ADMIN_SRC_DIR}/csi/csi-driver-smb/${smb_user}.keytab
+	ansibash -u ${ADMIN_SRC_DIR}/csi/csi-driver-smb/${smb_user}.keytab
+	rm ${ADMIN_SRC_DIR}/csi/csi-driver-smb/${smb_user}.keytab
+	ansibash -u ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh
+	ansibash sudo bash csi-driver-smb.sh keytabInstall ${smb_user}
+	ansibash sudo bash csi-driver-smb.sh krbTktSetup ${smb_user}
+	ansibash bash csi-driver-smb.sh krbTktStatus ${smb_user}
+	@echo "🚧  SMB user must be provisioned at Domain Controller (AD)." 
+csi-smb-host-mount :
+	ansibash -u ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh
+	ansibash sudo bash csi-driver-smb.sh mountCIFSkrb5 ${smb_user} service
+csi-smb-host-unmount csi-smb-host-umount :
+	ansibash -u ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh
+	ansibash sudo bash csi-driver-smb.sh mountCIFSkrb5 ${smb_user} unmount
+csi-smb-k8s : 
 	@echo "🛠️  WIP" 
 	bash ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh prep
 csi-local :

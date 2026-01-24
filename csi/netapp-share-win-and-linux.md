@@ -55,7 +55,7 @@ chown root:root /etc/krb5.keytab.svc_netapp
 
 ## Option 1: NFSv4 with Kerberos (Recommended for Linux-native workflows)
 
-This is generally cleaner for Linux hosts and provides strong security with `sec=krb5p` (encryption + integrity).
+This is generally cleaner for Linux hosts and provides strong security with `sec=krb5p` (encryption + integrity). However, iF SMB (CIFS) server is ONTAP, and __secuirty secttings__ are NTFS, then NFS protocol is not a viable option.
 
 **RHEL Configuration:**
 
@@ -121,6 +121,8 @@ dnf install -y cifs-utils keyutils
 ```
 create  cifs.spnego  *  *  /usr/sbin/cifs.upcall -c %k
 ```
+- The `cifs-utils` pkg provides this and other drop-in files 
+  to handle such tedium on sssd-integrated RHEL hosts.
 
 **Mount with Kerberos:**
 
