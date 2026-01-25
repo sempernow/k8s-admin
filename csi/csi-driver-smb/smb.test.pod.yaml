@@ -1,0 +1,25 @@
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: smb-pod 
+  namespace: smb
+  labels:
+    cifs: ""
+spec:
+  containers:
+  - name: volume-test
+    image: nginx:stable-alpine
+    imagePullPolicy: IfNotPresent
+    volumeMounts:
+    - name: vol1
+      mountPath: /data
+    ports:
+    - containerPort: 80
+    securityContext:
+      runAsUser: 1001
+      runAsGroup: 1001
+  volumes:
+  - name: vol1
+    persistentVolumeClaim:
+      claimName: smb-pvc

@@ -1,0 +1,100 @@
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: smb-krb5-creds
+  namespace: smb
+  labels:
+    cifs: ""
+type: Opaque
+data:
+  krb5.keytab: BQIAAABFAAEACExJTUUuTEFOAApzdmMtc21iLXJ3AAAAAQAAAAADABIAIAl6pXCO4ceURRTi0ifOs2o87jqtWEdI5cJXfDEjunCk
+  # Invalid UTF-8 if uncommented; Empty cache if commented out.
+  # krb5cc_322203108: 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
+  #username: c3ZjLXNtYi1yd0BMSU1FLkxBTg==
+#stringData:
+  #username: svc-smb-rw@LIME.LAN
+  #password: ""
+  #domain: LIME.LAN
+  #csi.storage.k8s.io/kerberos-keytab: "/path/to/keytab"
+  #csi.storage.k8s.io/kerberos-principal: "service/host@REALM"
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  annotations:
+    pv.kubernetes.io/provisioned-by: smb.csi.k8s.io
+  name: smb-pv
+  labels:
+    cifs: ""
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: "" # Prevent from using StorageClass smb 
+  mountOptions:
+    - sec=krb5
+    - vers=3.0
+    - dir_mode=0775
+    - file_mode=0640
+    - cruid=322203108
+    - uid=1001
+    - gid=1001
+    - noperm
+    - mfsymlinks
+    - cache=strict
+    - noserverino  # required to prevent data corruption
+  csi:
+    driver: smb.csi.k8s.io
+    volumeHandle: dc1.lime.lan.SMBdata
+    volumeAttributes:
+      source: //dc1.lime.lan/SMBdata
+    nodeStageSecretRef:
+      name: smb-krb5-creds
+      namespace: smb
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: smb-pvc
+  namespace: smb
+  labels:
+    cifs: ""
+spec:
+  storageClassName: "" # Prevent from using StorageClass smb 
+  volumeName: smb-pv
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: smb-pod 
+  namespace: smb
+  labels:
+    cifs: ""
+spec:
+  containers:
+  - name: volume-test
+    image: nginx:stable-alpine
+    imagePullPolicy: IfNotPresent
+    volumeMounts:
+    - name: vol1
+      mountPath: /data
+    ports:
+    - containerPort: 80
+    securityContext:
+      runAsUser: 1001
+      runAsGroup: 1001
+  volumes:
+  - name: vol1
+    persistentVolumeClaim:
+      claimName: smb-pvc

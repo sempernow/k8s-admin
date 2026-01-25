@@ -102,7 +102,18 @@ menu :
 	@echo "  -test      : Test dynamic PV provisioning and write access thereto by Pod/PVC manifest"
 	@echo "  -test-down : Teardown the test Pod/PVC/PV"
 	@echo "csi-nfs      : Install K8s CSI SC and Provisioner for NFS "
-	@echo "csi-smb      : WIP : Install K8s csi-driver-smb"
+	@echo "csi-smb      : K8s csi-driver-smb ..."
+	@echo " -host       : Configure nodes for CIFS (SMB) mounts"
+	@echo " -host-mount : Mount the SMB share at nodes"
+	@echo " -host-test  : Verify R/W access to node mount by smb user"
+	@echo " -host-umount: Unmount the SMB share at nodes"
+	@echo " -chart-prep : Muster the helm chart artifacts"
+	@echo " -up         : Install/Upgrade K8s csi-driver-smb"
+	@echo " -get        : kubectl get ..."
+	@echo " -down       : Teardown K8s csi-driver-smb"
+	@echo " -test-up    : Apply the SMB-test app"
+	@echo " -test-get   : kubectl get ..."
+	@echo " -test-down  : Delete the SMB-test app"
 	@echo "csi-rook-up  : Install Rook Operator / Ceph "
 	@echo "csi-rook-down: Teardown Rook Operator / Ceph "
 	$(INFO) "🚧  Observability"
@@ -736,26 +747,60 @@ csi-nfs1-test :
 	kubectl apply -f csi/nfs-subdir-external-provisioner/app.test-nfs.yaml 
 
 smb_user := svc-smb-rw
-csi-smb-host : 
-	ansibash 'type klist || sudo dnf -y install cifs-utils krb5-workstation'
-	type -t agede && agede ${ADMIN_SRC_DIR}/csi/csi-driver-smb/${smb_user}.keytab.age \
-	  |tee ${ADMIN_SRC_DIR}/csi/csi-driver-smb/${smb_user}.keytab
+#smb_pass := $(shell agede ${ADMIN_SRC_DIR}/csi/csi-driver-smb/svc-smb-rw.creds.age)
+# Domain is in NetBIOS name format: EXAMPLE, not EXAMPLE.COM
+smb_short := LIME
+smb_long  := LIME.LAN
+csi-smb-host : csi-smb-keytab csi-smb-creds
+	ansibash 'type -t klist || sudo dnf -y install cifs-utils krb5-workstation'
+	ansibash -u ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh
+	ansibash sudo bash csi-driver-smb.sh chartNodePrep
+	ansibash sudo bash csi-driver-smb.sh krbKeytabInstall ${smb_user}
+	ansibash sudo bash csi-driver-smb.sh krbTktService ${smb_user} ${smb_long}
+	ansibash bash csi-driver-smb.sh krbTktStatus ${smb_user}
+	@echo "🚧  Provision the SMB user (${smb_user}) at Domain Controller (AD)." 
+csi-smb-keytab :
+	@type -t agede && agede ${ADMIN_SRC_DIR}/csi/csi-driver-smb/${smb_user}.keytab.age \
+	  > ${ADMIN_SRC_DIR}/csi/csi-driver-smb/${smb_user}.keytab
 	ansibash -u ${ADMIN_SRC_DIR}/csi/csi-driver-smb/${smb_user}.keytab
 	rm ${ADMIN_SRC_DIR}/csi/csi-driver-smb/${smb_user}.keytab
-	ansibash -u ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh
-	ansibash sudo bash csi-driver-smb.sh keytabInstall ${smb_user}
-	ansibash sudo bash csi-driver-smb.sh krbTktSetup ${smb_user}
-	ansibash bash csi-driver-smb.sh krbTktStatus ${smb_user}
-	@echo "🚧  SMB user must be provisioned at Domain Controller (AD)." 
+csi-smb-creds :
+	@type -t agede >/dev/null 2>&1 && \
+	  ansibash sudo bash csi-driver-smb.sh smbSetCreds \
+	    ${smb_user} $(shell agede ${ADMIN_SRC_DIR}/csi/csi-driver-smb/svc-smb-rw.creds.age) ${smb_short} \
+		  || echo "❌ FAILed to decrypt smb password"
+
 csi-smb-host-mount :
 	ansibash -u ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh
 	ansibash sudo bash csi-driver-smb.sh mountCIFSkrb5 ${smb_user} service
+csi-smb-host-test :
+	ansibash -u ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh
+	ansibash bash csi-driver-smb.sh verifyAccess ${smb_user}
 csi-smb-host-unmount csi-smb-host-umount :
 	ansibash -u ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh
 	ansibash sudo bash csi-driver-smb.sh mountCIFSkrb5 ${smb_user} unmount
-csi-smb-k8s : 
-	@echo "🛠️  WIP" 
-	bash ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh prep
+
+values := values-krb5-keytab-mix.yaml
+csi-smb-chart-prep : 
+	rm ${ADMIN_SRC_DIR}/csi/csi-driver-smb/helm.template.yaml || true
+	cp ${ADMIN_SRC_DIR}/csi/csi-driver-smb/${values} \
+	   ${ADMIN_SRC_DIR}/csi/csi-driver-smb/values.mod.yaml
+	bash ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh chartPrep
+
+csi-smb-up csi-smb-install : csi-smb-chart-prep
+	bash ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh chartUp
+csi-smb-get :
+	bash ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh chartGet
+csi-smb-down csi-smb-teardown: 
+	bash ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh chartDown
+
+csi-smb-test-up : 
+	bash ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh smbTest apply
+csi-smb-test-get :
+	bash ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh smbTestGet
+csi-smb-test-down : 
+	bash ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh smbTest delete
+
 csi-local :
 	bash ${ADMIN_SRC_DIR}/csi/local-path-provisioner/local-path-provisioner.sh
 csi-rook-up :

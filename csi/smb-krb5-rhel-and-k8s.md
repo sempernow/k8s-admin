@@ -508,11 +508,42 @@ mountCIFSkrb5(){
 
 ### Kubernetes CSI: Kerberos Mount
 
+Install the `csi-driver-smb` chart.
+
 The `csi-driver-smb` node plugin runs as a privileged DaemonSet and performs `mount.cifs` in the host's mount namespace. The host kernel performs the SMB mount, so it uses the host's Kerberos credential cache.
+
+
+---
+
+#### Reference: CSI Driver SMB : [Kerberos ticket support for Linux](https://github.com/kubernetes-csi/csi-driver-smb/blob/master/docs/driver-parameters.md#kerberos-ticket-support-for-linux)
+
+Pass kerberos ticket in kubernetes secret 
+To pass a ticket through secret, it needs to be acquired. 
+Here's example how it can be done:
+
+```bash
+export KRB5CCNAME="/var/lib/kubelet/kerberos/krb5cc_1000"
+kinit USERNAME # Log in into domain
+kvno cifs/lowercase_server_name # Acquire ticket for the needed share, it'll be written to the cache file
+CCACHE=$(base64 -w 0 $KRB5CCNAME) # Get Base64-encoded cache
+```
+
+And passing the actual ticket to the secret, instead of the password.  
+Note that key for the ticket has included credential id, 
+that must match exactly cruid= mount flag. 
+In theory, nothing prevents from having more than single ticket cache in the same secret.
+
+```bash
+kubectl create secret generic smbcreds-krb5 --from-literal krb5cc_1000=$CCACHE
+```
+
+>The problems you encountered (empty/invalid cache, UTF-8 errors) are specific to how that driver handles the Secret. The community thread you referenced suggests it's a known experimental feature with bugs.
+
+---
 
 #### Option A: Host-Level Ticket Management (Recommended for Self-Managed Clusters)
 
-On **each Kubernetes node**:
+Configure **each Kubernetes node** same as that of host mount section:
 
 1. **Deploy keytab** to `/etc/svc-smb-rw.keytab`
 2. **Configure** `/etc/krb5.conf` for your domain

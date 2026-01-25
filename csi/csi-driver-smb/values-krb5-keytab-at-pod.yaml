@@ -1,0 +1,17 @@
+node:
+  extraVolumes:
+    - name: krb5-cache
+      hostPath:
+        path: /var/lib/kubelet/kerberos
+        type: DirectoryOrCreate
+    - name: krb5-conf
+      hostPath:
+        path: /etc/krb5.conf
+        type: File
+
+  extraVolumeMounts:
+    - name: krb5-cache
+      mountPath: /var/lib/kubelet/kerberos
+    - name: krb5-conf
+      mountPath: /etc/krb5.conf
+      readOnly: true
