@@ -261,9 +261,9 @@ $realm   = "$netbios.LAN"
 $sa      = "svc-smb-rw"
 $pass    = "__REDACTED__"
 
-cmd /c ktpass -princ $sa@$realm -mapuser $netbios\$sa -crypto AES256-SHA1 -ptype KRB5_NT_PRINCIPAL -pass $pass -out ${sa}.keytab
+ktpass -princ $sa@$realm -mapuser $netbios\$sa -crypto AES256-SHA1 -ptype KRB5_NT_PRINCIPAL -pass $pass -out "$sa.keytab"
+
 ```
-- Fails at PowerShell unless invoked by `cmd`.
 
 #### Option B: Generate on RHEL
 
@@ -522,10 +522,13 @@ To pass a ticket through secret, it needs to be acquired.
 Here's example how it can be done:
 
 ```bash
-export KRB5CCNAME="/var/lib/kubelet/kerberos/krb5cc_1000"
+cruid=$(id -u svc-smb-rw) # AD serice account for SMB shares management
+export KRB5CCNAME="/var/lib/kubelet/kerberos/krb5cc_$cruid"
 kinit USERNAME # Log in into domain
 kvno cifs/lowercase_server_name # Acquire ticket for the needed share, it'll be written to the cache file
 CCACHE=$(base64 -w 0 $KRB5CCNAME) # Get Base64-encoded cache
+
+kubectl create secret generic smbcreds-krb5 --from-literal krb5cc_$cruid=$CCACHE
 ```
 
 And passing the actual ticket to the secret, instead of the password.  

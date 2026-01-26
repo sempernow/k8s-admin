@@ -770,9 +770,11 @@ csi-smb-creds :
 	    ${smb_user} $(shell agede ${ADMIN_SRC_DIR}/csi/csi-driver-smb/svc-smb-rw.creds.age) ${smb_short} \
 		  || echo "❌ FAILed to decrypt smb password"
 
+# Modes : service:group
+mode := group
 csi-smb-host-mount :
 	ansibash -u ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh
-	ansibash sudo bash csi-driver-smb.sh mountCIFSkrb5 ${smb_user} service
+	ansibash sudo bash csi-driver-smb.sh mountCIFSkrb5 ${smb_user} ${mode}
 csi-smb-host-test :
 	ansibash -u ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh
 	ansibash bash csi-driver-smb.sh verifyAccess ${smb_user}
@@ -787,11 +789,11 @@ csi-smb-chart-prep :
 	   ${ADMIN_SRC_DIR}/csi/csi-driver-smb/values.mod.yaml
 	bash ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh chartPrep
 
-csi-smb-up csi-smb-install : csi-smb-chart-prep
+csi-smb-up csi-smb-chart-up csi-smb-install : csi-smb-chart-prep
 	bash ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh chartUp
 csi-smb-get :
 	bash ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh chartGet
-csi-smb-down csi-smb-teardown: 
+csi-smb-down csi-smb-chart-down csi-smb-teardown: 
 	bash ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh chartDown
 
 csi-smb-test-up : 

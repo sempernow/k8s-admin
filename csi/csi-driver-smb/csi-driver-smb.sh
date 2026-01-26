@@ -95,11 +95,12 @@ manifestTeardown(){
 
 ## Test SMB PV/PVC by mount in Pod (container)
 smbTest(){
-    kubectl $1 -f smb.test.yaml 
+    kubectl $1 -f hostpath-method/smb.host.test.yaml 
 }
 smbTestGet(){
     # Deploy with defaults first
     kubectl -n $ns get secret,pod,pvc,pv -l cifs
+    kubectl -n $ns logs -l cifs
 }
 
 ## Configure host for SMB-user AuthN by NTLMSSP (sec=ntlmssp)
@@ -196,6 +197,11 @@ krbTktStatus(){
 	sudo klist -c /var/lib/kubelet/kerberos/krb5cc_$(id $1 -u)
 }
 
+# Mount functions : Mount a Windows SMB share at Linux 
+# - Node and Pod users have access per UID:GID and dir/file mode settings,
+#   which vary per mount mode (service|group).
+# - The cruid regards only Kerberos AuthN user (on mount).
+
 ## Mount SMB share as user $1 using NTLMSSP for AuthN
 mountCIFSntlmssp(){ 
     [[ "$(id -u)" -ne 0 ]] && return 1
@@ -203,9 +209,6 @@ mountCIFSntlmssp(){
     svc=$1
     mode=${2:-service} # service|group|unmount
    
-    # 2. Mount a Windows SMB share at Linux 
-    #    (Regardless of its local filesystem format.)
-    realm=LIME
     server=dc1.lime.lan
     share=SMBdata
     mnt=/mnt/smb-data-01
@@ -248,12 +251,12 @@ mountCIFSkrb5(){
     svc=$1
     mode=${2:-service} # service|group|unmount
 
-    realm=LIME
     server=dc1.lime.lan
     share=SMBdata
     mnt=/mnt/smb-data-01
     mkdir -p $mnt || return 3
-    uid="$(id -u $svc)"
+    cruid="$(id -u $svc)"
+    uid=1001
 
     [[ $mode == unmount ]] && {
         umount $mnt
@@ -261,12 +264,13 @@ mountCIFSkrb5(){
         return $?
     }
     echo "ℹ️ Mount SMB share as user '$1' for mode '$mode' access to $(hostname):$mnt using Kerberos for AuthN."
- 
+
     # Allow R/W access by only AD User 'svc-smb-rw' 
-    gid="$(id -g $svc)"
+    #gid="$(id -g $svc)"
+    gid=$uid
     [[ $mode == service ]] && {
         mount -t cifs //$server/$share $mnt \
-            -o sec=krb5,vers=3.0,cruid=$uid,uid=$uid,gid=$gid,file_mode=0640,dir_mode=0775 ||
+            -o sec=krb5,vers=3.0,cruid=$cruid,uid=$uid,gid=$gid,file_mode=0640,dir_mode=0775 ||
                 return 4
     }
     
@@ -274,7 +278,7 @@ mountCIFSkrb5(){
     gid="$(getent group ad-smb-admins |cut -d: -f3)"
     [[ $mode == group ]] && {
         mount -t cifs //$server/$share $mnt \
-            -o sec=krb5,vers=3.0,cruid=$uid,uid=$uid,gid=$gid,file_mode=0660,dir_mode=0775 ||
+            -o sec=krb5,vers=3.0,cruid=$cruid,uid=$uid,gid=$gid,file_mode=0660,dir_mode=0775 ||
                 return 5
     }
     
@@ -282,9 +286,9 @@ mountCIFSkrb5(){
     
     return 0
 }
-## Verify R/W access to host-mounted SMB share as user $1 
 verifyAccess(){
     [[ $1 ]] || return 1
+    echo "ℹ️ Verify access by $1@$(hostname -f) : $(id $1)"
     sudo -u $1 bash -c '
         target=/mnt/smb-data-01/$(date -Id)-$(id -un)-at-$(hostname -f).txt
         echo $(date -Is) : Hello from $(id -un) @ $(hostname -f) |tee -a $target
