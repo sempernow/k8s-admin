@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: hostpath-cifs-pod
+  labels:
+    cifs: ""
+spec:
+  restartPolicy: Never
+  containers:
+    - name: test
+      image: busybox
+      #command: ["sleep", "3600"]
+      command: ["/bin/sh", "-c"]
+      args:
+        - |
+            write(){
+              target=/data/$(date -Id)-$(id -un)-at-$(hostname -f).txt
+              set -x
+              echo $(date -Is) : Hello from $(id -un) @ $(hostname -f) >> $target
+              ls -hl $target 
+              cat $target 
+              set +x
+            }
+            #export -f write # Not @ busybox
+            write 
+            sleep 1h
+
+      volumeMounts:
+        - name: data
+          mountPath: /data
+      securityContext:
+        #runAsUser: 322203108
+        #runAsGroup: 322200513
+        runAsUser: 1001
+        runAsGroup: 1001
+  volumes:
+    - name: data
+      hostPath:
+        path: /mnt/smb-data-01
+        type: Directory

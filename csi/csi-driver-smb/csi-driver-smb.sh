@@ -75,7 +75,7 @@ chartGet(){
     kubectl -n $ns get deploy,ds,pod,cm,secret,pvc,pv -l app.kubernetes.io/name=csi-driver-smb
 }
 chartDown(){
-    helm -n $ns remove $release
+    helm -n $ns uninstall $release
 }
 
 ## Install by Manifest (kubectl)
@@ -95,11 +95,15 @@ manifestTeardown(){
 
 ## Test SMB PV/PVC by mount in Pod (container)
 smbTest(){
-    kubectl $1 -f smb.test.yaml 
+    # hostPath
+    kubectl $1 -f hostpath-method/hostpath-cifs-pod.yaml 
+    # csi-driver-smb
+    #kubectl $1 -f smb.test.node-managed-ticket.yaml 
 }
 smbTestGet(){
     # Deploy with defaults first
-    kubectl -n $ns get secret,pod,pvc,pv -l cifs
+    kubectl -n default get secret,pod,pvc,pv -l cifs
+    kubectl -n default logs -l cifs
 }
 
 ## Configure host for SMB-user AuthN by NTLMSSP (sec=ntlmssp)
@@ -119,8 +123,12 @@ smbSetCreds(){
 
 ## Configure host for SMB-user AuthN by Kerberos (sec=krb5)
 krbKeytabInstall(){
+    # Requires the (AD) provisioned SMB user ($1), and their keytab file at ~/$1.keytab
     [[ "$(id -u)" -ne 0 ]] && return 1
     [[ $1 ]] || return 2
+    [[ -f ${1}.keytab ]] || return 3
+    id -u $1 || return 4
+
     target=/etc/${1}.keytab
     ls -hl $target && {
         echo "ℹ️ NO CHANGE : $target was ALREADY installed."
@@ -132,7 +140,7 @@ krbKeytabInstall(){
     chmod 600 $target
 }
 krbTktService(){
-	## User ($1), REALM ($2)
+	## User ($1), REALM FQDN ($2)
     [[ "$(id -u)" -ne 0 ]] && return 1
     [[ $2 ]] || return 2
     systemctl is-active ${1}-kinit.timer && {
@@ -140,7 +148,16 @@ krbTktService(){
 
         return 0
     }
-    echo "ℹ️ Creating ${1}-kinit.service + .timer (systemd) so that user '$1' has periodic Kerberos ticket renewal"
+    # Destroy existing KCM-based cache of AD user $1
+    sudo -u $1 kdestroy
+    # Destroy existing declared cache 
+    kdestroy -c /var/lib/kubelet/kerberos/krb5cc_$(id $1 -u)
+    # Acquire KCM-based ticket for AD user:
+    #sudo -u $1 kinit -k -t /etc/$1.keytab $1@LIME.LAN
+    # List all ticket cache of declared user
+    sudo -u $1 klist
+
+    echo -e "\nℹ️ Creating ${1}-kinit.service + .timer (systemd) so that user '$1' has periodic Kerberos ticket renewal"
 
     systemctl disable --now ${1}-kinit.timer
     sleep 2
@@ -155,11 +172,14 @@ krbTktService(){
 	[Service]
 	Type=oneshot
 	User=$1
-	# Write to file-based cache for CSI driver
 	Environment=KRB5CCNAME=FILE:/var/lib/kubelet/kerberos/krb5cc_$(id $1 -u)
 	ExecStart=/usr/bin/kinit -k -t /etc/${1}.keytab ${1}@$2
-	# Also refresh KCM cache for host mounts
+
+	# 1. Refresh KCM cache for host-level tools : KCM (Kerberos Credential Manager) is of SSSD
 	ExecStartPost=/bin/bash -c 'KRB5CCNAME=KCM: /usr/bin/kinit -k -t /etc/${1}.keytab ${1}@$2'
+
+	# 2. Fix permissions so the CSI Driver pod can read the file
+	ExecStartPost=+/usr/bin/chmod 644 /var/lib/kubelet/kerberos/krb5cc_$(id $1 -u)
 	EOH
 
     # Timer : Enable
@@ -181,20 +201,30 @@ krbTktService(){
 }
 krbTktStatus(){
     [[ $1 ]] || return 1
-    echo "ℹ️ Status of systemd : Kerberos ticket renewal (.service + .timer) for user: $1"
+    echo -e "\nℹ️ systemd : Status of Kerberos ticket renewal (service and timer) for user '$1'"
 
     # Check timer is active and scheduled
+    echo -e "\n🔍 Timer : Want 'active'"
     systemctl status ${1}-kinit.timer --no-pager --full
 
     # Check last service run
+    echo -e "\n🔍 Service (static) : Want 'inactive'"
     systemctl status ${1}-kinit.service --no-pager --full
 
-    # Verify ticket exists
-    echo "ℹ️ klist : Kerberos ticket cache for user: $1"
-	ls -ahl /var/lib/kubelet/kerberos/
+    echo -e "\nℹ️ klist : KCM ticket cache for user '$1'"
 	sudo -u $1 klist
+
+    # Verify ticket exists
+    echo -e "\nℹ️ klist : File-based Kerberos ticket cache for user '$1'"
+	ls -ahl /var/lib/kubelet/kerberos/
 	sudo klist -c /var/lib/kubelet/kerberos/krb5cc_$(id $1 -u)
+
 }
+
+# Mount functions : Mount a Windows SMB share at Linux 
+# - Node and Pod users have access per UID:GID and dir/file mode settings,
+#   which vary per mount mode (service|group).
+# - The cruid regards only Kerberos AuthN user (on mount).
 
 ## Mount SMB share as user $1 using NTLMSSP for AuthN
 mountCIFSntlmssp(){ 
@@ -203,9 +233,6 @@ mountCIFSntlmssp(){
     svc=$1
     mode=${2:-service} # service|group|unmount
    
-    # 2. Mount a Windows SMB share at Linux 
-    #    (Regardless of its local filesystem format.)
-    realm=LIME
     server=dc1.lime.lan
     share=SMBdata
     mnt=/mnt/smb-data-01
@@ -221,7 +248,7 @@ mountCIFSntlmssp(){
     echo "ℹ️ Mount SMB share as user '$1' for mode '$mode' access to $(hostname):$mnt using NTLMSSP for AuthN."
  
     # Restrict R/W access to (AD) user $1
-    gid="$(id -g svc-smb-rw)"
+    gid="$(id -g $1)"
     [[ $mode == service ]] && {
         mount -t cifs //$server/$share $mnt \
             -o sec=ntlmssp,vers=3.0,credentials=$creds,uid=$uid,gid=$gid,file_mode=0640,dir_mode=0775 ||
@@ -248,12 +275,12 @@ mountCIFSkrb5(){
     svc=$1
     mode=${2:-service} # service|group|unmount
 
-    realm=LIME
     server=dc1.lime.lan
     share=SMBdata
     mnt=/mnt/smb-data-01
     mkdir -p $mnt || return 3
-    uid="$(id -u $svc)"
+    cruid="$(id -u $svc)"
+    uid=1001
 
     [[ $mode == unmount ]] && {
         umount $mnt
@@ -261,12 +288,13 @@ mountCIFSkrb5(){
         return $?
     }
     echo "ℹ️ Mount SMB share as user '$1' for mode '$mode' access to $(hostname):$mnt using Kerberos for AuthN."
- 
-    # Allow R/W access by only AD User 'svc-smb-rw' 
-    gid="$(id -g $svc)"
+
+    # Allow R/W access by only AD User '$1' 
+    #gid="$(id -g $svc)"
+    gid=$uid
     [[ $mode == service ]] && {
         mount -t cifs //$server/$share $mnt \
-            -o sec=krb5,vers=3.0,cruid=$uid,uid=$uid,gid=$gid,file_mode=0640,dir_mode=0775 ||
+            -o sec=krb5,vers=3.0,cruid=$cruid,uid=$uid,gid=$gid,file_mode=0640,dir_mode=0775 ||
                 return 4
     }
     
@@ -274,7 +302,7 @@ mountCIFSkrb5(){
     gid="$(getent group ad-smb-admins |cut -d: -f3)"
     [[ $mode == group ]] && {
         mount -t cifs //$server/$share $mnt \
-            -o sec=krb5,vers=3.0,cruid=$uid,uid=$uid,gid=$gid,file_mode=0660,dir_mode=0775 ||
+            -o sec=krb5,vers=3.0,cruid=$cruid,uid=$uid,gid=$gid,file_mode=0660,dir_mode=0775 ||
                 return 5
     }
     
@@ -282,9 +310,9 @@ mountCIFSkrb5(){
     
     return 0
 }
-## Verify R/W access to host-mounted SMB share as user $1 
 verifyAccess(){
     [[ $1 ]] || return 1
+    echo "ℹ️ Verify access by $1@$(hostname -f) : $(id $1)"
     sudo -u $1 bash -c '
         target=/mnt/smb-data-01/$(date -Id)-$(id -un)-at-$(hostname -f).txt
         echo $(date -Is) : Hello from $(id -un) @ $(hostname -f) |tee -a $target

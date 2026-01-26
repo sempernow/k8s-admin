@@ -104,6 +104,7 @@ menu :
 	@echo "csi-nfs      : Install K8s CSI SC and Provisioner for NFS "
 	@echo "csi-smb      : K8s csi-driver-smb ..."
 	@echo " -host       : Configure nodes for CIFS (SMB) mounts"
+	@echo " -krb-status:  klist"
 	@echo " -host-mount : Mount the SMB share at nodes"
 	@echo " -host-test  : Verify R/W access to node mount by smb user"
 	@echo " -host-umount: Unmount the SMB share at nodes"
@@ -754,11 +755,10 @@ smb_long  := LIME.LAN
 csi-smb-host : csi-smb-keytab csi-smb-creds
 	ansibash 'type -t klist || sudo dnf -y install cifs-utils krb5-workstation'
 	ansibash -u ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh
-	ansibash sudo bash csi-driver-smb.sh chartNodePrep
+	ansibash sudo bash csi-driver-smb.sh chartNodePrep ${smb_user}
 	ansibash sudo bash csi-driver-smb.sh krbKeytabInstall ${smb_user}
 	ansibash sudo bash csi-driver-smb.sh krbTktService ${smb_user} ${smb_long}
 	ansibash bash csi-driver-smb.sh krbTktStatus ${smb_user}
-	@echo "🚧  Provision the SMB user (${smb_user}) at Domain Controller (AD)." 
 csi-smb-keytab :
 	@type -t agede && agede ${ADMIN_SRC_DIR}/csi/csi-driver-smb/${smb_user}.keytab.age \
 	  > ${ADMIN_SRC_DIR}/csi/csi-driver-smb/${smb_user}.keytab
@@ -769,10 +769,15 @@ csi-smb-creds :
 	  ansibash sudo bash csi-driver-smb.sh smbSetCreds \
 	    ${smb_user} $(shell agede ${ADMIN_SRC_DIR}/csi/csi-driver-smb/svc-smb-rw.creds.age) ${smb_short} \
 		  || echo "❌ FAILed to decrypt smb password"
+csi-smb-krb-status : 
+	ansibash -u ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh
+	ansibash bash csi-driver-smb.sh krbTktStatus ${smb_user}
 
+# Modes : service:group
+mode := group
 csi-smb-host-mount :
 	ansibash -u ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh
-	ansibash sudo bash csi-driver-smb.sh mountCIFSkrb5 ${smb_user} service
+	ansibash sudo bash csi-driver-smb.sh mountCIFSkrb5 ${smb_user} ${mode}
 csi-smb-host-test :
 	ansibash -u ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh
 	ansibash bash csi-driver-smb.sh verifyAccess ${smb_user}
@@ -787,11 +792,11 @@ csi-smb-chart-prep :
 	   ${ADMIN_SRC_DIR}/csi/csi-driver-smb/values.mod.yaml
 	bash ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh chartPrep
 
-csi-smb-up csi-smb-install : csi-smb-chart-prep
+csi-smb-up csi-smb-chart-up csi-smb-install : csi-smb-chart-prep
 	bash ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh chartUp
 csi-smb-get :
 	bash ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh chartGet
-csi-smb-down csi-smb-teardown: 
+csi-smb-down csi-smb-chart-down csi-smb-teardown: 
 	bash ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh chartDown
 
 csi-smb-test-up : 

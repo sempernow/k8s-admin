@@ -1,0 +1,76 @@
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  annotations:
+    pv.kubernetes.io/provisioned-by: smb.csi.k8s.io
+  name: smb-pv
+  labels:
+    cifs: ""
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: "" # Prevent from using StorageClass smb 
+  mountOptions:
+    - sec=krb5
+    - vers=3.0
+    - dir_mode=0775
+    - file_mode=0640
+    - cruid=322203108
+    - uid=1000
+    - gid=1000
+    - noperm
+    - mfsymlinks
+    - cache=strict
+    - noserverino  # required to prevent data corruption
+  csi:
+    driver: smb.csi.k8s.io
+    volumeHandle: dc1.lime.lan.SMBdata
+    volumeAttributes:
+      source: //dc1.lime.lan/SMBdata
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: smb-pvc
+  namespace: smb
+  labels:
+    cifs: ""
+spec:
+  storageClassName: "" # Prevent from using StorageClass smb 
+  volumeName: smb-pv
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: smb-pod 
+  namespace: smb
+  labels:
+    cifs: ""
+spec:
+  containers:
+  - name: volume-test
+    image: nginx:stable-alpine
+    imagePullPolicy: IfNotPresent
+    volumeMounts:
+    - name: smb-mount
+      mountPath: /data
+    ports:
+    - containerPort: 80
+    securityContext:
+      runAsUser: 1001
+      runAsGroup: 1001
+  volumes:
+  - name: smb-mount
+    persistentVolumeClaim:
+      claimName: smb-pvc

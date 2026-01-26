@@ -7,9 +7,19 @@
 The filesystem format (NTFS, FAT32, ...) is irrelevant.   
 The CIFS (SMB) protocol handles that.
 
-## SMB (CIFS) Access from RHEL and Kubernetes
-
 See __`../smb-krb5-rhel-and-k8s`__ ([MD](../smb-krb5-rhel-and-k8s.md)|[HTML](../smb-krb5-rhel-and-k8s.html))
+
+
+## TL;DR
+
+The driver, `csi-driver-smb` v1.19.1, has bug preventing mount if using Kerberos.
+
+The fundamental __issue is the driver's gRPC handling of binary data__.
+The node-level Kerberos setup is solid; the ___CSI driver just can't consume it properly___.
+
+Workaround is to mount the SMB share at all nodes,
+and use `hostPath` for access in Pods.
+
 
 ## NetApp CIFS export
 
@@ -49,6 +59,24 @@ then the **right move is to access it via SMB/CIFS**, *not* NFS.
 ## Pod-managed Kerberos Tickets
 
 See [__`csi-krb5-pod-managed.md`__](csi-krb5-pod-managed.md)
+
+
+## [Kerberos Support for Linux](https://github.com/kubernetes-csi/csi-driver-smb/blob/master/docs/driver-parameters.md#kerberos-ticket-support-for-linux)
+## SMB (CIFS) Access from RHEL and Kubernetes
+
+
+### TL;DR
+
+The csi-driver-smb v1.19.1 has a driver bug preventing the use of Kerberos authentication.
+
+The workaround is a node-level Kerberos setup, which is proven stable;
+the ___CSI driver just can't consume it properly___.
+
+
+
+### CSI driver limitation
+
+`csi-driver-smb` v1.19.1 cannot handle binary Kerberos credential caches — gRPC marshaling fails with UTF-8 error. Consider filing an issue at https://github.com/kubernetes-csi/csi-driver-smb/issues.
 
 ---
 
