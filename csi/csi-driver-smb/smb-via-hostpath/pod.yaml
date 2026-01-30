@@ -1,9 +1,9 @@
 apiVersion: v1
 kind: Pod
 metadata:
-  name: hostpath-cifs-pod
+  name: smb-via-hostpath-pod
   labels:
-    cifs: ""
+    smb: ""
 spec:
   restartPolicy: Never
   containers:
@@ -14,14 +14,15 @@ spec:
       args:
         - |
             write(){
-              target=/data/$(date -Id)-$(id -un)-at-$(hostname -f).txt
+              target=/data/$(date -Id)-$(id -u)-at-$(hostname -f).txt
               set -x
-              echo $(date -Is) : Hello from $(id -un) @ $(hostname -f) >> $target
+              echo $(date -Is) : Hello from $(id -u) @ $(hostname -f) >> $target
               ls -hl $target 
               cat $target 
               set +x
             }
             #export -f write # Not @ busybox
+            export target=/data/$(date -Id)-$(id -u)-at-$(hostname -f).txt
             write 
             sleep 1h
 

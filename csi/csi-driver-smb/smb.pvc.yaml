@@ -4,7 +4,7 @@ kind: PersistentVolumeClaim
 metadata:
   name: smb-pvc
   labels:
-    cifs: ""
+    smb: ""
 spec:
   storageClassName: smb-csi
   accessModes:

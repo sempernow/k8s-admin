@@ -5,7 +5,7 @@ metadata:
   name: smb-pod 
   namespace: smb
   labels:
-    cifs: ""
+    smb: ""
 spec:
   containers:
   - name: volume-test

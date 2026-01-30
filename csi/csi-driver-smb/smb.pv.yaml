@@ -7,7 +7,7 @@ metadata:
     pv.kubernetes.io/provisioned-by: smb.csi.k8s.io
   name: pv-smb
   labels:
-    cifs: ""
+    smb: ""
 spec:
   capacity:
     storage: 100Gi

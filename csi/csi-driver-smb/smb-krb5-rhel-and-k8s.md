@@ -46,13 +46,13 @@ Get-NetFirewallRule -DisplayGroup "File and Printer Sharing" |
 
 ```powershell
 $realm  = "LIME.LAN"
-$sa     = "svc-smb-rw"
+$user     = "svc-smb-rw"
 $pass   = "__REDACTED__"
 $securePass = ConvertTo-SecureString $pass -AsPlainText -Force
 
-New-ADUser -Name "$sa" `
-    -SamAccountName "$sa" `
-    -UserPrincipalName "$sa@$realm" `
+New-ADUser -Name "$user" `
+    -SamAccountName "$user" `
+    -UserPrincipalName "$user@$realm" `
     -Path "OU=ServiceAccounts,OU=OU1,DC=lime,DC=lan" `
     -AccountPassword $securePass `
     -PasswordNeverExpires $true `
@@ -61,9 +61,9 @@ New-ADUser -Name "$sa" `
     -Enabled $true
 
 # For read-write access:
-Add-ADGroupMember -Identity "ad-smb-admins" -Members "$sa"
+Add-ADGroupMember -Identity "ad-smb-admins" -Members "$user"
 # For read-only access:
-# Add-ADGroupMember -Identity "ad-smb-users" -Members "$sa"
+# Add-ADGroupMember -Identity "ad-smb-users" -Members "$user"
 ```
 - Use `-AccountPassword (Read-Host -AsSecureString "Password")` for interactive password entry
 - `KerberosEncryptionType AES128,AES256` enforces AES only (no RC4/DES) for security/FIPS compliance
@@ -71,14 +71,14 @@ Add-ADGroupMember -Identity "ad-smb-admins" -Members "$sa"
 #### Verify Service Account
 
 ```powershell
-Get-ADUser -Identity "$sa"
-Get-ADPrincipalGroupMembership -Identity "$sa" | Select-Object Name
+Get-ADUser -Identity "$user"
+Get-ADPrincipalGroupMembership -Identity "$user" | Select-Object Name
 ```
 
 ### 4. Harden Service Account (Optional)
 
 ```powershell
-Set-ADUser -Identity "$sa" -HomeDirectory $null -ProfilePath $null
+Set-ADUser -Identity "$user" -HomeDirectory $null -ProfilePath $null
 ```
 
 ---
@@ -215,19 +215,25 @@ and why our `klist` shows `KCM:322203108` rather than `FILE:/tmp/krb5cc_32220310
 
 ```powershell
 # Generate keytab on Windows DC:
-$realm  = "LIME.LAN"
-$sa     = "svc-smb-rw"
-$pass   = "__REDACTED__"
+$netbios    = "LIME"
+$realm      = "$netbios.LAN"
+$user         = "svc-smb-rw"
+$pass       = "__REDACTED__"
 
-cmd /c ktpass -princ $sa@$realm -mapuser LIME\$sa -pass $pass -crypto AES256-SHA1 -ptype KRB5_NT_PRINCIPAL -out $sa.keytab
+ktpass -princ $user@$realm -mapuser $netbios\$user -crypto AES256-SHA1 -ptype KRB5_NT_PRINCIPAL -pass $pass -out "$user.keytab"
 ```
 
+**Configure Keytab**
 
 ```bash
 # Set keytab permissions on RHEL:
 sudo chown svc-smb-rw: /etc/svc-smb-rw.keytab
 sudo chmod 600 /etc/svc-smb-rw.keytab
+```
 
+**Manage tickets (cache)**
+
+```bash
 # Destroy existing KCM-based cache of AD user svc-smb-rw
 sudo -u svc-smb-rw kdestroy
 # Destroy existing declared cache 
@@ -265,10 +271,10 @@ Using __`ktpass`__
 ```powershell
 $netbios = "LIME"
 $realm   = "$netbios.LAN"
-$sa      = "svc-smb-rw"
+$user      = "svc-smb-rw"
 $pass    = "__REDACTED__"
 
-ktpass -princ $sa@$realm -mapuser $netbios\$sa -crypto AES256-SHA1 -ptype KRB5_NT_PRINCIPAL -pass $pass -out "$sa.keytab"
+ktpass -princ $user@$realm -mapuser $netbios\$user -crypto AES256-SHA1 -ptype KRB5_NT_PRINCIPAL -pass $pass -out "$user.keytab"
 
 ```
 
@@ -286,20 +292,27 @@ getent passwd svc-smb-rw@LIME.LAN
 # svc-smb-rw:*:322203108:322200513:svc-smb-rw:/home/svc-smb-rw:/bin/bash
 ```
 
-**Verify KVNO (Key Version Number)** at either Windows or RHEL:
+**Verify KVNO** (**K**ey **V**ersion **N***umber*) at either Windows or RHEL:
 
 **On Windows:**
 
 ```powershell
-Get-ADUser $sa -Properties msDS-KeyVersionNumber | Select-Object msDS-KeyVersionNumber
+$user = "svc-smb-rw"
+Get-ADUser $user -Properties msDS-KeyVersionNumber | Select-Object msDS-KeyVersionNumber
 ```
 
 **On RHEL:**
 
 ```bash
 sudo dnf install -y openldap-clients
-kinit u2@LIME.LAN
-ldapsearch -H ldap://dc1.lime.lan -Y GSSAPI -b "DC=lime,DC=lan" "(sAMAccountName=svc-smb-rw)" msDS-KeyVersionNumber
+
+user=svc-smb-rw
+realm=LIME.LAN
+
+kinit $user@$realm # Only if expired
+
+# Get LDAP info of $user, including KVNO
+sudo -u $user ldapsearch -H ldap://dc1.lime.lan -Y GSSAPI -b "DC=lime,DC=lan" "(sAMAccountName=$user)" msDS-KeyVersionNumber
 ```
 
 **Install required packages:**
@@ -322,11 +335,14 @@ sudo ktutil
 **Non-interactive method:**
 
 ```bash
-password="$(agede svc-smb-rw.creds.age)"
+user=svc-smb-rw
+realm=LIME.LAN
+kvno=__INTEGER_MUST_MATCH_THAT_AT_AD__
+pass="$(agede $user.creds.age)"
 sudo ktutil <<EOF
-addent -password -p svc-smb-rw@LIME.LAN -k <KVNO> -e aes256-cts-hmac-sha1-96
-$password
-wkt /etc/svc-smb-rw.keytab
+addent -password -p $user@$realm -k $kvno -e aes256-cts-hmac-sha1-96
+$pass
+wkt /etc/$user.keytab
 quit
 EOF
 ```
@@ -359,19 +375,20 @@ sudo chmod 600 /etc/svc-smb-rw.keytab
 #### 4. Verify Keytab and Cache
 
 ```bash
+user=svc-smb-rw
 # Keytab file
 # - Static file containing the principal's long-term keys. 
 # - Used to obtain tickets without a password. 
 # - Doesn't change unless regenerated
 #   (e.g., after password rotation or KVNO bump).
-sudo klist -k -t /etc/svc-smb-rw.keytab
+sudo klist -k -t /etc/$user.keytab
 
 # Credential cache
 # - Dynamic/runtime cache of actual Kerberos tickets 
 #   (TGT + service tickets)
 # - Tickets expire, get renewed, and rotate throughout the day 
 #   as the principal authenticates to services.
-sudo -u svc-smb-rw klist  
+sudo -u $user klist  
 
 ```
 - Credential cache is what a current AuthN attempt would rely upon.
@@ -382,10 +399,10 @@ then regenerate keytab on Windows:
 ```powershell
 $netbios    = "LIME"
 $realm      = "$netbios.LAN"
-$sa         = "svc-smb-rw"
+$user       = "svc-smb-rw"
 $password   = "__REDACTED__"
 
-cmd /c ktpass -princ $sa@$realm -mapuser $sa@$realm -pass $password -crypto AES256-SHA1 -ptype KRB5_NT_PRINCIPAL -out ${sa}.keytab
+ktpass -princ $user@$realm -mapuser $user@$realm -pass $password -crypto AES256-SHA1 -ptype KRB5_NT_PRINCIPAL -out "${user}.keytab"
 ```
 
 #### 5. Acquire Kerberos Ticket
@@ -467,14 +484,15 @@ sudo systemctl enable --now svc-smb-rw-kinit.timer
 **Verify**
 
 ```bash
+user=svc-smb-rw
 # Check timer is active and scheduled
-systemctl status svc-smb-rw-kinit.timer
+systemctl status ${user}-kinit.timer
 
 # Check last service run
-systemctl status svc-smb-rw-kinit.service
+systemctl status ${user}-kinit.service
 
 # Verify ticket exists
-sudo -u svc-smb-rw klist
+sudo -u ${user} klist
 ```
 
 > **Alternative:** The `k5start` package from `kstart` (EPEL) handles refresh automatically and can be daemonized.
@@ -490,14 +508,14 @@ mountCIFSkrb5(){
     server=dc1.lime.lan
     share=SMBdata
     mnt=/mnt/smb-data-01
-    svc=svc-smb-rw
+    user=svc-smb-rw
     mkdir -p $mnt || return 3
-    uid="$(id -u $svc)"
+    uid="$(id -u $user)"
 
     [[ $mode == unmount ]] && { umount $mnt; return $?; }
     echo "Mount CIFS share from $(hostname -f) for '$mode' access using Kerberos."
 
-    gid="$(id -g svc-smb-rw)"
+    gid="$(id -g $user)"
     [[ $mode == service ]] && {
         mount -t cifs //$server/$share $mnt -o sec=krb5,vers=3.0,cruid=$uid,uid=$uid,gid=$gid,file_mode=0640,dir_mode=0775 || return 4
     }
@@ -529,7 +547,8 @@ To pass a ticket through secret, it needs to be acquired.
 Here's example how it can be done:
 
 ```bash
-cruid=$(id -u svc-smb-rw) # AD serice account for SMB shares management
+user=svc-smb-rw
+cruid=$(id -u $user) # AD serice account for SMB shares management
 export KRB5CCNAME="/var/lib/kubelet/kerberos/krb5cc_$cruid"
 kinit USERNAME # Log in into domain
 kvno cifs/lowercase_server_name # Acquire ticket for the needed share, it'll be written to the cache file

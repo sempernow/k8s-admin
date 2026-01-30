@@ -85,7 +85,7 @@ manifestInstall(){
     kubectl apply -f $template.yaml
 }
 manifestGet(){
-    kubectl -n $ns get secret,pod,pvc,pv -l cifs
+    kubectl -n $ns get secret,pod,pvc,pv -l smb
 }
 manifestTeardown(){
     # Deploy with defaults first
@@ -96,14 +96,14 @@ manifestTeardown(){
 ## Test SMB PV/PVC by mount in Pod (container)
 smbTest(){
     # hostPath
-    kubectl $1 -f hostpath-method/hostpath-cifs-pod.yaml 
+    kubectl $1 -f smb-via-hostpath/pod.yaml 
     # csi-driver-smb
     #kubectl $1 -f smb.test.node-managed-ticket.yaml 
 }
 smbTestGet(){
     # Deploy with defaults first
-    kubectl -n default get secret,pod,pvc,pv -l cifs
-    kubectl -n default logs -l cifs
+    kubectl -n default get secret,pod,pvc,pv -l smb
+    kubectl -n default logs -l smb
 }
 
 ## Configure host for SMB-user AuthN by NTLMSSP (sec=ntlmssp)

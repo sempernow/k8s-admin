@@ -1,5 +1,10 @@
 # [NFS Subdir External Provisioner](https://github.com/kubernetes-sigs/nfs-subdir-external-provisioner )
 
+## DEPRICATED : Use `csi-driver-nfs`
+
+
+## Summary
+
 K8s (CSI-compliant) External Provisioner that dynamically provisions NFS (client host) storage (`PersistentVolume`) per claim (`PersistentVolumeClaim`).
 
     SERVER:MOUNT/${namespace}-${pvcName}-${pvName}

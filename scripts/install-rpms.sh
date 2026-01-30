@@ -12,6 +12,12 @@ ok(){
     # K8s dependency
     dnf -y --color=never install conntrack || return 22
 
+    smb='
+    cifs-utils
+    krb5-workstation
+    openldap-clients
+    '
+
     # Tools
     all='
     dnf-plugins-core
