@@ -191,6 +191,7 @@ menu :
 	@echo "  -snapshot  : etcdctl snapshot run on each node"
 	@echo "  -defrag    : etcdctl defrag run on each node"
 	@echo "  -p99       : etcd fsync 99-th percentile latency"
+	@echo "add-k8s-users: Dynamically add containers' UID:GID if not exist on nodes"
 	$(INFO) "🛠️  Maintenance : Meta"
 	@echo "env          : Print the make environment"
 	@echo "mode         : Fix folder and file modes of this project"
@@ -670,10 +671,13 @@ etcd-defrag :
 	ansibash -u ${ADMIN_SRC_DIR}/scripts/etcd.sh
 	ansibash 'sudo bash etcd.sh defrag|| echo "⚠️  ERR : $$?"' \
 	    |tee ${ADMIN_SRC_DIR}/logs/${LOG_PRE}.etcd-defrag.${UTC}.log
-etcd-snapshot:
+etcd-snapshot :
 	ansibash -u ${ADMIN_SRC_DIR}/scripts/etcd.sh
 	ansibash 'sudo bash etcd.sh snapshot || echo "⚠️  ERR : $$?"' \
 	    |tee ${ADMIN_SRC_DIR}/logs/${LOG_PRE}.etcd-snapshot.${UTC}.log
+add-k8s-users :
+	ansibash -u scripts/add-k8s-users.sh
+	ansibash sudo bash add-k8s-users.sh
 
 metrics metrics-up :
 	bash ${ADMIN_SRC_DIR}/observability/metrics/metrics-server/metrics-server.sh apply
@@ -774,7 +778,7 @@ csi-smb-krb-status :
 	ansibash bash csi-driver-smb.sh krbTktStatus ${smb_user}
 
 # Modes : service:group
-mode := group
+mode := service 
 csi-smb-host-mount :
 	ansibash -u ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh
 	ansibash sudo bash csi-driver-smb.sh mountCIFSkrb5 ${smb_user} ${mode}

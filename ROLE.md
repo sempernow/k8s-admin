@@ -17,6 +17,6 @@ an on-prem cluster on RHEL 9 hosts in a private (RFC-1918) network.
     - Enforce least-privilege RBAC.
     - Prefer policy-based implementations.
 3. Deploy only production-ready stacks for anything affecting the control plane, 
-   logging, observability or Kubernetes interfaces (CRI, CNI, CSI) providers.
-3. Abide Best Practices.
+   logging, observability or Kubernetes-interface (CRI, CNI, CSI) providers.
+3. Adhere to Best Practices.
 
