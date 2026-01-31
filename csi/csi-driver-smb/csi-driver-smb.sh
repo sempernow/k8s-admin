@@ -19,7 +19,6 @@ url=$base/v$ver/$archive
 release=$chart
 template=helm.template
 ns=smb
-
 values=values.mod.yaml
 
 chartPrep(){
@@ -98,6 +97,7 @@ manifestTeardown(){
     kubectl delete ns $ns
 }
 
+smb_user=k8s-1001 # NOT the smb_krb5_user (cruid) user
 ## Usage: krbKeytabInstall <username>  
 ## Configure host for SMB-user AuthN by Kerberos (sec=krb5)
 ## - Idempotent
@@ -228,16 +228,16 @@ krbTktStatus(){
 mountCIFSntlmssp(){ 
     [[ "$(id -u)" -ne 0 ]] && return 1
     [[ $1 ]] || return 2
-    svc=$1
+    smb_krb5_user=$1
     mode=${2:-service} # service|group|unmount
    
     server=dc1.lime.lan
     share=SMBdata
     mnt=/mnt/smb-data-01
     ## Creds only if sec=ntlmssp 
-    creds=/etc/$svc.creds
+    creds=/etc/$smb_krb5_user.creds
     mkdir -p $mnt || return 4
-    uid="$(id -u $svc)"
+    uid="$(id -u $smb_krb5_user)"
 
     [[ $mode == unmount ]] && {
         umount $mnt
@@ -270,26 +270,28 @@ mountCIFSntlmssp(){
 mountCIFSkrb5(){
     [[ "$(id -u)" -ne 0 ]] && return 1
     [[ $1 ]] || return 2
-    svc=$1
+    smb_krb5_user=$1
     mode=${2:-service} # service|group|unmount
 
     server=dc1.lime.lan
     share=SMBdata
+    smb_admins=ad-smb-admins
+    cruid="$(id -u $smb_krb5_user)"
+    uid="$(id -u $smb_user)"
+    
     mnt=/mnt/smb-data-01
     mkdir -p $mnt || return 3
-    cruid="$(id -u $svc)"
-    uid=1001
 
     [[ $mode == unmount ]] && {
         umount $mnt
         ls -hl $mnt
         return $?
     }
-    echo "ℹ️ Mount SMB share as user '$1' for mode '$mode' access to $(hostname):$mnt using Kerberos for AuthN."
+    
+    echo "ℹ️ Mount SMB share as user '$smb_krb5_user' for mode '$mode' access to $(hostname):$mnt using Kerberos for AuthN."
 
     # Allow R/W access by only AD User '$1' 
-    #gid="$(id -g $svc)"
-    gid=$uid
+    gid="$(id -g $smb_user)"
     [[ $mode == service ]] && {
         mount -t cifs //$server/$share $mnt \
             -o sec=krb5,vers=3.0,cruid=$cruid,uid=$uid,gid=$gid,file_mode=0640,dir_mode=0775 ||
@@ -297,7 +299,7 @@ mountCIFSkrb5(){
     }
     
     # Allow R/W access by all members of AD Group 'ad-smb-admins'
-    gid="$(getent group ad-smb-admins |cut -d: -f3)"
+    gid="$(getent group $smb_admins |cut -d: -f3)"
     [[ $mode == group ]] && {
         mount -t cifs //$server/$share $mnt \
             -o sec=krb5,vers=3.0,cruid=$cruid,uid=$uid,gid=$gid,file_mode=0660,dir_mode=0775 ||
@@ -309,9 +311,9 @@ mountCIFSkrb5(){
     return 0
 }
 verifyAccess(){
-    [[ $1 ]] || return 1
-    echo "ℹ️ Verify access by $1@$(hostname -f) : $(id $1)"
-    sudo -u $1 bash -c '
+    [[ $1 ]] && user=$1 || user=$smb_user
+    echo "ℹ️ Verify access by $user@$(hostname -f) : $(id $user)"
+    sudo -u $user bash -c '
         target=/mnt/smb-data-01/$(date -Id)-$(id -un)-at-$(hostname -f).txt
         echo $(date -Is) : Hello from $(id -un) @ $(hostname -f) |tee -a $target
         ls -hl $target 

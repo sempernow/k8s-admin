@@ -751,7 +751,7 @@ csi-nfs1 :
 csi-nfs1-test : 
 	kubectl apply -f csi/nfs-subdir-external-provisioner/app.test-nfs.yaml 
 
-smb_user := svc-smb-rw
+smb_krb5_user := svc-smb-rw
 #smb_pass := $(shell agede ${ADMIN_SRC_DIR}/csi/csi-driver-smb/svc-smb-rw.creds.age)
 # Domain is in NetBIOS name format: EXAMPLE, not EXAMPLE.COM
 smb_short := LIME
@@ -759,36 +759,36 @@ smb_long  := LIME.LAN
 csi-smb-host : csi-smb-keytab csi-smb-creds
 	ansibash 'type -t klist || sudo dnf -y install cifs-utils krb5-workstation'
 	ansibash -u ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh
-	ansibash sudo bash csi-driver-smb.sh chartNodePrep ${smb_user}
-	ansibash sudo bash csi-driver-smb.sh installTools ${smb_user}
-	ansibash sudo bash csi-driver-smb.sh krbKeytabInstall ${smb_user}
-	ansibash sudo bash csi-driver-smb.sh krbTktService ${smb_user} ${smb_long}
-	ansibash bash csi-driver-smb.sh krbTktStatus ${smb_user}
+	ansibash sudo bash csi-driver-smb.sh chartNodePrep ${smb_krb5_user}
+	ansibash sudo bash csi-driver-smb.sh installTools ${smb_krb5_user}
+	ansibash sudo bash csi-driver-smb.sh krbKeytabInstall ${smb_krb5_user}
+	ansibash sudo bash csi-driver-smb.sh krbTktService ${smb_krb5_user} ${smb_long}
+	ansibash bash csi-driver-smb.sh krbTktStatus ${smb_krb5_user}
 csi-smb-keytab :
-	@type -t agede && agede ${ADMIN_SRC_DIR}/csi/csi-driver-smb/${smb_user}.keytab.age \
-	  > ${ADMIN_SRC_DIR}/csi/csi-driver-smb/${smb_user}.keytab
-	ansibash -u ${ADMIN_SRC_DIR}/csi/csi-driver-smb/${smb_user}.keytab
-	rm ${ADMIN_SRC_DIR}/csi/csi-driver-smb/${smb_user}.keytab
+	@type -t agede && agede ${ADMIN_SRC_DIR}/csi/csi-driver-smb/${smb_krb5_user}.keytab.age \
+	  > ${ADMIN_SRC_DIR}/csi/csi-driver-smb/${smb_krb5_user}.keytab
+	ansibash -u ${ADMIN_SRC_DIR}/csi/csi-driver-smb/${smb_krb5_user}.keytab
+	rm ${ADMIN_SRC_DIR}/csi/csi-driver-smb/${smb_krb5_user}.keytab
 csi-smb-creds :
 	@type -t agede >/dev/null 2>&1 && \
 	  ansibash sudo bash csi-driver-smb.sh smbSetCreds \
-	    ${smb_user} $(shell agede ${ADMIN_SRC_DIR}/csi/csi-driver-smb/svc-smb-rw.creds.age) ${smb_short} \
+	    ${smb_krb5_user} $(shell agede ${ADMIN_SRC_DIR}/csi/csi-driver-smb/svc-smb-rw.creds.age) ${smb_short} \
 		  || echo "❌ FAILed to decrypt smb password"
 csi-smb-krb-status : 
 	ansibash -u ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh
-	ansibash bash csi-driver-smb.sh krbTktStatus ${smb_user}
+	ansibash bash csi-driver-smb.sh krbTktStatus ${smb_krb5_user}
 
 # Modes : service:group
 mode := service 
 csi-smb-host-mount :
 	ansibash -u ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh
-	ansibash sudo bash csi-driver-smb.sh mountCIFSkrb5 ${smb_user} ${mode}
+	ansibash sudo bash csi-driver-smb.sh mountCIFSkrb5 ${smb_krb5_user} ${mode}
 csi-smb-host-test :
 	ansibash -u ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh
-	ansibash bash csi-driver-smb.sh verifyAccess ${smb_user}
+	ansibash bash csi-driver-smb.sh verifyAccess 
 csi-smb-host-unmount csi-smb-host-umount :
 	ansibash -u ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh
-	ansibash sudo bash csi-driver-smb.sh mountCIFSkrb5 ${smb_user} unmount
+	ansibash sudo bash csi-driver-smb.sh mountCIFSkrb5 ${smb_krb5_user} unmount
 
 csi-smb-chart-prep : 
 	rm ${ADMIN_SRC_DIR}/csi/csi-driver-smb/helm.template.yaml || true
