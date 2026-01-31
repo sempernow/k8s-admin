@@ -358,7 +358,7 @@ By AD User (service account) __`sw-smb-rw`__
 #### 1. Install Packages
 
 ```bash
-sudo dnf install cifs-utils krb5-workstation
+sudo dnf install cifs-utils krb5-workstation openldap-clients
 ```
 
 #### 2. Deploy Keytab

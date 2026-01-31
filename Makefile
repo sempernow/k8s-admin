@@ -760,6 +760,7 @@ csi-smb-host : csi-smb-keytab csi-smb-creds
 	ansibash 'type -t klist || sudo dnf -y install cifs-utils krb5-workstation'
 	ansibash -u ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh
 	ansibash sudo bash csi-driver-smb.sh chartNodePrep ${smb_user}
+	ansibash sudo bash csi-driver-smb.sh installTools ${smb_user}
 	ansibash sudo bash csi-driver-smb.sh krbKeytabInstall ${smb_user}
 	ansibash sudo bash csi-driver-smb.sh krbTktService ${smb_user} ${smb_long}
 	ansibash bash csi-driver-smb.sh krbTktStatus ${smb_user}
@@ -789,18 +790,15 @@ csi-smb-host-unmount csi-smb-host-umount :
 	ansibash -u ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh
 	ansibash sudo bash csi-driver-smb.sh mountCIFSkrb5 ${smb_user} unmount
 
-values := values-krb5-keytab-mix.yaml
 csi-smb-chart-prep : 
 	rm ${ADMIN_SRC_DIR}/csi/csi-driver-smb/helm.template.yaml || true
-	cp ${ADMIN_SRC_DIR}/csi/csi-driver-smb/${values} \
-	   ${ADMIN_SRC_DIR}/csi/csi-driver-smb/values.mod.yaml
 	bash ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh chartPrep
 
-csi-smb-up csi-smb-chart-up csi-smb-install : csi-smb-chart-prep
+csi-smb-up : csi-smb-chart-prep
 	bash ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh chartUp
 csi-smb-get :
 	bash ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh chartGet
-csi-smb-down csi-smb-chart-down csi-smb-teardown: 
+csi-smb-down : 
 	bash ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh chartDown
 
 csi-smb-test-up : 

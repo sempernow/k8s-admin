@@ -6,6 +6,11 @@
 # - https://github.com/kubernetes-csi/csi-driver-smb 
 ########################################################################
 
+installTools(){
+    [[ "$(id -u)" -ne 0 ]] && return 1
+    dnf install -y cifs-utils krb5-workstation openldap-clients
+}
+
 chart=csi-driver-smb
 ver=1.19.1
 archive=${chart}-$ver.tgz
@@ -15,7 +20,7 @@ release=$chart
 template=helm.template
 ns=smb
 
-values=values.yaml
+values=values.mod.yaml
 
 chartPrep(){
     # 1. Pull the chart and extract values.yaml
@@ -93,112 +98,105 @@ manifestTeardown(){
     kubectl delete ns $ns
 }
 
-## Test SMB PV/PVC by mount in Pod (container)
-smbTest(){
-    # hostPath
-    kubectl $1 -f smb-via-hostpath/pod.yaml 
-    # csi-driver-smb
-    #kubectl $1 -f smb.test.node-managed-ticket.yaml 
-}
-smbTestGet(){
-    # Deploy with defaults first
-    kubectl -n default get secret,pod,pvc,pv -l smb
-    kubectl -n default logs -l smb
-}
-
-## Configure host for SMB-user AuthN by NTLMSSP (sec=ntlmssp)
-smbSetCreds(){
-    [[ "$(id -u)" -ne 0 ]] && return 1
-    ## SMB domain ($3) is in NetBIOS format, not SPN; EXAMPLE not EXAMPLE.COM 
-    [[ $3 ]] || echo "  USAGE: $FUNCNAME user pass realm 2>&"
-    [[ $3 ]] || return 2
-    
-	tee /etc/$1.creds <<-EOH
-	username=$1
-	password=$2
-	domain=$3
-	EOH
-    chmod 600 /etc/$1.creds
-}
-
+## Usage: krbKeytabInstall <username>  
 ## Configure host for SMB-user AuthN by Kerberos (sec=krb5)
+## - Idempotent
 krbKeytabInstall(){
-    # Requires the (AD) provisioned SMB user ($1), and their keytab file at ~/$1.keytab
+    ## Requires the (AD) provisioned SMB user, and their keytab file at ~/$user.keytab
     [[ "$(id -u)" -ne 0 ]] && return 1
     [[ $1 ]] || return 2
     [[ -f ${1}.keytab ]] || return 3
     id -u $1 || return 4
-
-    target=/etc/${1}.keytab
-    ls -hl $target && {
-        echo "ℹ️ NO CHANGE : $target was ALREADY installed."
+    user="$1"
+    target=/etc/${user}.keytab
+    ls -hl $target 2>/dev/null && {
+        echo "ℹ️ NO CHANGE : keytab file '$target' was ALREADY installed."
         
         return 0
     }
-    cp ${1}.keytab $target
-    chown $1: $target
+    cp ${user}.keytab $target
+    chown $user: $target
     chmod 600 $target
+    ls -hl $target 
 }
-krbTktService(){
-	## User ($1), REALM FQDN ($2)
+## Usage: krbTktService <username> <realm_fqdn> [OVERWRITE(regardless of status)]
+## Creates systemd service and timer for periodic Kerberos ticket (cache) renewals.
+## - No changes if timer status is "active", unless OVERWRITE param (*any* $3) is set.
+krbTktService() {
+    local user="$1"
+    local realm="$2"
+    local overwrite="$3"
+    
     [[ "$(id -u)" -ne 0 ]] && return 1
-    [[ $2 ]] || return 2
-    systemctl is-active ${1}-kinit.timer && {
-        echo "ℹ️ NO CHANGE : ${1}-kinit.timer is ALREADY active"
+    [[ $realm ]] || return 2
+    systemctl is-active ${user}-kinit.timer && [[ ! $overwrite ]] && {
+        echo "ℹ️ NO CHANGE : ${user}-kinit.timer is ALREADY active"
 
         return 0
     }
-    # Destroy existing KCM-based cache of AD user $1
-    sudo -u $1 kdestroy
-    # Destroy existing declared cache 
-    kdestroy -c /var/lib/kubelet/kerberos/krb5cc_$(id $1 -u)
-    # Acquire KCM-based ticket for AD user:
-    #sudo -u $1 kinit -k -t /etc/$1.keytab $1@LIME.LAN
+    ## Destroy KCM-based cache of declared AD user
+    sudo -u $user kdestroy
+    ## Destroy file-based cache of declared AD user
+    kdestroy -c /var/lib/kubelet/kerberos/krb5cc_$(id $user -u)
+
+    ## Uncomment `sudo ...` statements to acquire now, else wait OnActiveSec (See timer).
+    # Acquire KCM-based ticket for declared AD user:
+    #sudo -u $user kinit -k -t /etc/$user.keytab $user@LIME.LAN
     # List all ticket cache of declared user
-    sudo -u $1 klist
+    #sudo -u $user klist
 
-    echo -e "\nℹ️ Creating ${1}-kinit.service + .timer (systemd) so that user '$1' has periodic Kerberos ticket renewal"
+    echo -e "\nℹ️ Creating ${user}-kinit.service + .timer (systemd) so that user '$user' has periodic Kerberos ticket renewal"
 
-    systemctl disable --now ${1}-kinit.timer
-    sleep 2
+    systemctl disable --now ${user}-kinit.timer
 
-    # Service is static : Do NOT enable
-	tee /etc/systemd/system/${1}-kinit.service <<-EOH
-	# /etc/systemd/system/${1}-kinit.service
+    ## Service is static : Do *not* enable
+	tee /etc/systemd/system/${user}-kinit.service <<-EOH
+	# /etc/systemd/system/${user}-kinit.service
 	[Unit]
-	Description=Renew Kerberos ticket for ${1}
+	Description=Renew Kerberos ticket for ${user}
 	After=network-online.target
 
 	[Service]
 	Type=oneshot
-	User=$1
-	Environment=KRB5CCNAME=FILE:/var/lib/kubelet/kerberos/krb5cc_$(id $1 -u)
-	ExecStart=/usr/bin/kinit -k -t /etc/${1}.keytab ${1}@$2
+	User=$user
+	# 1. Refresh file cache for Linux Kernel (CIFS/SMB client) integration with K8s CSI Driver 
+	Environment=KRB5CCNAME=FILE:/var/lib/kubelet/kerberos/krb5cc_$(id $user -u)
+	ExecStart=/usr/bin/kinit -k -t /etc/${user}.keytab ${user}@$realm
 
-	# 1. Refresh KCM cache for host-level tools : KCM (Kerberos Credential Manager) is of SSSD
-	ExecStartPost=/bin/bash -c 'KRB5CCNAME=KCM: /usr/bin/kinit -k -t /etc/${1}.keytab ${1}@$2'
-
-	# 2. Fix permissions so the CSI Driver pod can read the file
-	ExecStartPost=+/usr/bin/chmod 644 /var/lib/kubelet/kerberos/krb5cc_$(id $1 -u)
+	# 2. Refresh KCM cache of SSSD's KCM (Kerberos Credential Manager) for Host-level tools (klist, ldapsearch, ssh) 
+	ExecStartPost=/bin/bash -c 'KRB5CCNAME=KCM: /usr/bin/kinit -k -t /etc/${user}.keytab ${user}@$realm'
 	EOH
 
-    # Timer : Enable
-	tee /etc/systemd/system/${1}-kinit.timer <<-EOH
-	# /etc/systemd/system/${1}-kinit.timer 
+    ## Timer : Do enable
+	tee /etc/systemd/system/${user}-kinit.timer <<-EOH
+	# /etc/systemd/system/${user}-kinit.timer 
 	[Unit]
-	Description=Renew Kerberos ticket every 4 hours
+	Description=Renew Kerberos ticket every 3 hours
 
 	[Timer]
+	# Trigger shortly after timer is enabled
+	OnActiveSec=1min
+	# Trigger shortly after boot
 	OnBootSec=1min
-	OnUnitActiveSec=4h
+	# Renew every 3 hours after last run : Kerberos ticket (cache) expiry is 10 hrs.
+	OnUnitActiveSec=3h
+	# Catch up missed runs after restart, sleep, shutdown, etc.
+	Persistent=true
 
 	[Install]
 	WantedBy=timers.target
 	EOH
     
     systemctl daemon-reload
-    systemctl enable --now ${1}-kinit.timer
+    systemctl enable --now ${user}-kinit.timer
+
+    ## Allow Pod (cruid) access : Should not be necessary : proper file owner set by "User" param of service unit file.
+    #group=ad-smb-admins # *** HARD CODED *** 
+    #chown $user:$group /var/lib/kubelet/kerberos/krb5cc_$(id $user -u)
+    #chown $user: /var/lib/kubelet/kerberos/krb5cc_$(id $user -u)
+    #chmod 600 /var/lib/kubelet/kerberos/krb5cc_$(id $user -u)
 }
+
 krbTktStatus(){
     [[ $1 ]] || return 1
     echo -e "\nℹ️ systemd : Status of Kerberos ticket renewal (service and timer) for user '$1'"
@@ -319,6 +317,37 @@ verifyAccess(){
         ls -hl $target 
         cat $target 
     '
+}
+
+## Usage: smbTest apply|delete
+## Test Pod access to csi-driver-smb mount : PVC to PV of cifs/smb mount
+smbtestns=default #$ns
+smbTest(){
+    ## hostPath
+    kubectl $1 -f smb-via-hostpath/pod.yaml 
+    ## csi-driver-smb
+    #kubectl -n $smbtestns $1 -f csi-krb5-host-managed.yaml
+}
+smbTestGet(){
+    # Deploy with defaults first
+    kubectl -n $smbtestns get secret,pod,pvc,pv -l smb
+    kubectl -n $smbtestns logs -l smb ||
+        kubectl -n $smbtestns describe pod -l smb
+}
+
+## Configure host for SMB-user AuthN by NTLMSSP (sec=ntlmssp)
+smbSetCreds(){
+    [[ "$(id -u)" -ne 0 ]] && return 1
+    ## SMB domain ($3) is in NetBIOS format, not SPN; EXAMPLE not EXAMPLE.COM 
+    [[ $3 ]] || echo "  USAGE: $FUNCNAME user pass realm 2>&"
+    [[ $3 ]] || return 2
+    
+	tee /etc/$1.creds <<-EOH
+	username=$1
+	password=$2
+	domain=$3
+	EOH
+    chmod 600 /etc/$1.creds
 }
 
 [[ $1 ]] || {

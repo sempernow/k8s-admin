@@ -38,7 +38,7 @@ mount -t cifs //dc1.lime.lan/SMBData /mnt/smb-data-01 \
 ### 4. Apply the Pod spec
 
 ```bash
-kubectl apply -f smb-via-hostpath-pod.yaml
+kubectl apply -f pod.yaml
 ```
-- [__`smb-via-hostpath-pod.yaml`__](./smb-via-hostpath-pod.yaml)
+- [__`smb-via-hostpath-pod.yaml`__](./pod.yaml)
 

@@ -9,7 +9,7 @@ See [`halb`](https://github.com/sempernow/halb "GitHub : sempernow/halb") for th
 See `make` recipes
 
 ```bash
-make
+make # List the recipes
 ```
 
 ## Topics

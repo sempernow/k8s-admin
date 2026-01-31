@@ -1,0 +1,26 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: smb-krb5-pv
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  mountOptions:
+    - sec=krb5
+    # cruid MUST match the suffix of your krb5cc_322203108 file
+    - cruid=322203108
+    - vers=3.0
+    # Optional: ensure files appear as your preferred pod user
+    - uid=1001
+    - gid=1001
+  csi:
+    driver: smb.csi.k8s.io
+    volumeHandle: dc1-lime-lan-smbdata 
+    volumeAttributes:
+      source: //dc1.lime.lan/SMBdata
+      # Halucinated : Tells the driver where to look on the HOST for the ticket
+      #krb5CacheDirectory: "/var/lib/kubelet/kerberos/"
+      #krb5Prefix: "krb5cc_"
