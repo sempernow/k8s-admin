@@ -63,12 +63,12 @@ while read -r uid; do
     (( uid > maxLocalUID )) && continue
     
     if id "k8s-${uid}" &>/dev/null; then
-        #echo "  Exists: k8s-${uid}"
         continue
     fi
     
     if useradd --system --no-create-home --shell /usr/sbin/nologin "k8s-${uid}" --uid "$uid" 2>/dev/null; then
         usermod --lock "k8s-${uid}"
+        groupadd --system "k8s-$1" --gid "$1" 2>/dev/null || true
         echo "  Added: k8s-${uid} (uid=$uid)"
     fi
 done < <(yq '.[].uid' "$tmpfile" 2>/dev/null | sort -nu)
@@ -79,14 +79,12 @@ while read -r gid; do
     (( gid > maxLocalGID )) && continue
     
     if getent group "k8s-${gid}" &>/dev/null; then
-        #echo "  Exists: k8s-${gid}"
         continue
     fi
     
     # Check if GID already taken by another group
     if getent group "$gid" &>/dev/null; then
         existing="$(getent group "$gid" | cut -d: -f1)"
-        #echo "  Skipped: GID $gid already used by group '$existing'"
         continue
     fi
     
@@ -108,33 +106,57 @@ echo ""
 exit $?
 #######
 
-#!/usr/bin/env bash
-################################################################
-# Dynamically add system user/group for each container UID/GID.
-# - Run on all nodes that allow workloads.
-################################################################
-## v0.0.1
+## v0.0.2
 
 [[ "$(id -u)" -ne 0 ]] && {
     echo "❌  ERR : MUST run as root" >&2
     
     exit 1
 }
-type yq >/dev/null || exit 2
 
-kubeconfig=${1:-/etc/kubernetes/admin.conf}
-list=ctnr_uid_gid_list.yaml
-kubectl get pod -A --kubeconfig=$kubeconfig -o yaml |
-    yq '.items[].spec.containers[].securityContext 
-          |select(.runAsUser != null or .runAsGroup != null) 
-          | [{"uid":.runAsUser,"gid":.runAsGroup}]
-    ' > $list
+for cmd in yq kubectl; do
+    command -v "$cmd" >/dev/null || {
+        echo "❌  ERR: $cmd not found" >&2
+        exit 2
+    }
+done
 
-## No need to add non-local (AD) UID/GID
-maxLocalUID="$(grep '\bUID_MAX\b' /etc/login.defs |awk '{printf $2}')"
-maxLocalGID="$(grep '\bGID_MAX\b' /etc/login.defs |awk '{printf $2}')"
+kubeconfig="${1:-/etc/kubernetes/admin.conf}"
+[[ -f "$kubeconfig" ]] || {
+    echo "❌  ERR: kubeconfig not found: $kubeconfig" >&2
+    exit 3
+}
 
-echo === Add Orphan UIDs
+echo "=== Fetching pod securityContexts..."
+
+list="$(mktemp)"
+trap 'rm -f "$list"' EXIT
+
+if ! kubectl get pod -A --kubeconfig="$kubeconfig" -o yaml > "$list.raw" 2>&1; then
+    echo "❌  ERR: kubectl failed:" >&2
+    cat "$list.raw" >&2
+    exit 4
+fi
+
+## Extract UIDs/GIDs from pod-level, containers, initContainers, ephemeralContainers
+yq '[
+  .items[] | (
+    (.spec.securityContext | select(.) | {"uid":.runAsUser,"gid":.runAsGroup}),
+    (.spec.containers[]?.securityContext | select(.) | {"uid":.runAsUser,"gid":.runAsGroup}),
+    (.spec.initContainers[]?.securityContext | select(.) | {"uid":.runAsUser,"gid":.runAsGroup}),
+    (.spec.ephemeralContainers[]?.securityContext | select(.) | {"uid":.runAsUser,"gid":.runAsGroup})
+  ) | select(.uid != null or .gid != null)
+] | unique' "$list.raw" > "$list"
+
+rm -f "$list.raw"
+
+## Get local UID/GID boundaries (skip AD/LDAP ranges)
+maxLocalUID="$(awk '/^UID_MAX/ {print $2}' /etc/login.defs)"
+maxLocalGID="$(awk '/^GID_MAX/ {print $2}' /etc/login.defs)"
+: "${maxLocalUID:=60000}"
+: "${maxLocalGID:=60000}"
+
+echo "=== Adding users per container UIDs..."
 ## Add GID on orphan UID so that probability of mixed contexts (non-k8s GID) is lower.
 yq .[].uid $list |sort -nu |xargs -IX /bin/bash -c '
     [[ $1 == "null" ]] && exit 
@@ -146,7 +168,7 @@ yq .[].uid $list |sort -nu |xargs -IX /bin/bash -c '
     groupadd --system "k8s-$1" --gid "$1" 2>/dev/null || true
 ' "$maxLocalUID" X
 
-echo === Add Orphan GIDs
+echo "=== Adding groups per container GIDs..."
 yq .[].gid $list |sort -nu |xargs -IX /bin/bash -c '
     [[ $1 == "null" ]] && exit 
     [[ $0 && ( $1 -gt $0 ) ]] && exit
@@ -156,8 +178,8 @@ yq .[].gid $list |sort -nu |xargs -IX /bin/bash -c '
 ' "$maxLocalGID" X
 
 echo '=== List k8s-* UIDs'
-grep k8s /etc/passwd
+grep '^k8s-' /etc/passwd || echo "  (none)"
 
 echo '=== List k8s-* GIDs'
-grep k8s /etc/group
+grep '^k8s-' /etc/group || echo "  (none)"
 
