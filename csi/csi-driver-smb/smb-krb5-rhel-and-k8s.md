@@ -19,9 +19,9 @@ Complete these steps on the Domain Controller before configuring RHEL or Kuberne
 ### 1. Create SMB Share and Folder
 
 ```powershell
-$smbDomain = (Get-ADDomain).NetBIOSName  # e.g., LIME
-$smbName = "SMBData"
-$smbPath = "C:\Shares\$smbName"
+$smbDomain  = (Get-ADDomain).NetBIOSName  # e.g., LIME
+$smbName    = "SMBData"
+$smbPath    = "C:\Shares\$smbName"
 
 New-Item -Path "$smbPath" -ItemType Directory
 
@@ -45,9 +45,9 @@ Get-NetFirewallRule -DisplayGroup "File and Printer Sharing" |
 ### 3. Create AD Service Account
 
 ```powershell
-$realm  = "LIME.LAN"
-$user     = "svc-smb-rw"
-$pass   = "__REDACTED__"
+$realm      = "LIME.LAN"
+$user       = "svc-smb-rw"
+$pass       = "__REDACTED__"
 $securePass = ConvertTo-SecureString $pass -AsPlainText -Force
 
 New-ADUser -Name "$user" `
@@ -60,10 +60,11 @@ New-ADUser -Name "$user" `
     -KerberosEncryptionType AES128,AES256 `
     -Enabled $true
 
-# For read-write access:
+# Group having read-write access:
 Add-ADGroupMember -Identity "ad-smb-admins" -Members "$user"
-# For read-only access:
-# Add-ADGroupMember -Identity "ad-smb-users" -Members "$user"
+
+# Group having read-only access:
+#Add-ADGroupMember -Identity "ad-smb-users" -Members "$user"
 ```
 - Use `-AccountPassword (Read-Host -AsSecureString "Password")` for interactive password entry
 - `KerberosEncryptionType AES128,AES256` enforces AES only (no RC4/DES) for security/FIPS compliance
@@ -158,7 +159,7 @@ setCreds(){
     chmod 600 /etc/cifs/$1.creds
 }
 
-mountCIFS(){
+mountCIFSntlmssp(){
     [[ "$(id -u)" -ne 0 ]] && return 1
     mode=${1:-service}  # service|group|unmount
 
@@ -168,10 +169,10 @@ mountCIFS(){
     server=dc1.lime.lan
     share=SMBdata
     mnt=/mnt/smb-data-01
-    svc=svc-smb-rw
-    creds=/etc/cifs/$svc.creds
+    username=svc-smb-rw
+    creds=/etc/cifs/$username.creds
     mkdir -p $mnt || return 3
-    uid="$(id -u $svc)"
+    uid="$(id -u $username)"
 
     [[ $mode == unmount ]] && { umount $mnt; return $?; }
     echo "Mount CIFS share from $(hostname -f) for '$mode' access."
@@ -196,7 +197,10 @@ mountCIFS(){
 
 AD User (service account) __`sw-smb-rw`__ AuthN by Kerberos
 
-KCM is SSSD's **K**erberos **C**redential **M**anager. 
+
+### Kerberos ___Credentials Cache___
+
+__KCM__ is SSSD's **K**erberos **C**redential **M**anager. 
 When a Linux (RHEL) host is joined into the AD domain via "`realm join`" 
 (or manual SSSD config), __the default credential cache__, 
 declared in **`/etc/krb5.conf`**, 
@@ -210,72 +214,24 @@ is set to KCM:
 That's why `kinit` run _as any user_ stores tickets in KCM automatically, 
 and why our `klist` shows `KCM:322203108` rather than `FILE:/tmp/krb5cc_322203108`.
 
-
-### Quick Reference (TL;DR)
-
-```powershell
-# Generate keytab on Windows DC:
-$netbios    = "LIME"
-$realm      = "$netbios.LAN"
-$user         = "svc-smb-rw"
-$pass       = "__REDACTED__"
-
-ktpass -princ $user@$realm -mapuser $netbios\$user -crypto AES256-SHA1 -ptype KRB5_NT_PRINCIPAL -pass $pass -out "$user.keytab"
-```
-
-**Configure Keytab**
-
-```bash
-# Set keytab permissions on RHEL:
-sudo chown svc-smb-rw: /etc/svc-smb-rw.keytab
-sudo chmod 600 /etc/svc-smb-rw.keytab
-```
-
-**Manage tickets (cache)**
-
-```bash
-# Destroy existing KCM-based cache of AD user svc-smb-rw
-sudo -u svc-smb-rw kdestroy
-# Destroy existing declared cache 
-kdestroy -c /var/lib/kubelet/kerberos/krb5cc_$(id svc-smb-rw -u)
-# Acquire KCM-based ticket for AD user:
-sudo -u svc-smb-rw kinit -k -t /etc/svc-smb-rw.keytab svc-smb-rw@LIME.LAN
-# List all ticket cache of declared user
-sudo -u svc-smb-rw klist
-
-
-# Mount:
-realm=LIME; server=dc1.lime.lan; share=SMBdata; mnt=/mnt/smb-data-01; svc=svc-smb-rw
-mkdir -p $mnt
-uid="$(id -u $svc)"; gid="$(id -g $svc)"
-mount -t cifs //$server/$share $mnt -o sec=krb5,vers=3.0,cruid=$uid,uid=$uid,gid=$gid,file_mode=0640,dir_mode=0775
-```
-
-**Key Points:**
-
-- KVNO (**K**ey **V**ersion **N**umber) 
-  must match between keytab and AD 
-  (regenerate keytab after password changes)
-- Ticket must be in the correct user's cache (not root's)
-- `ktutil` on Linux doesn't know the real KVNO, 
-   so better using `ktpass` on Windows
-
 ---
+<a id="generate-keytab-file"></a>
 
-### Keytab Generation
+### Kerberos ___Keytab___
+
 
 #### Option A: Generate on Windows Server (Recommended)
 
 Using __`ktpass`__
 
 ```powershell
-$netbios = "LIME"
-$realm   = "$netbios.LAN"
-$user      = "svc-smb-rw"
-$pass    = "__REDACTED__"
+# Generate keytab on Windows DC:
+$netbios    = "LIME"
+$realm      = "$netbios.LAN"
+$user       = "svc-smb-rw"
+$pass       = "__REDACTED__"
 
 ktpass -princ $user@$realm -mapuser $netbios\$user -crypto AES256-SHA1 -ptype KRB5_NT_PRINCIPAL -pass $pass -out "$user.keytab"
-
 ```
 
 #### Option B: Generate on RHEL
@@ -292,41 +248,42 @@ getent passwd svc-smb-rw@LIME.LAN
 # svc-smb-rw:*:322203108:322200513:svc-smb-rw:/home/svc-smb-rw:/bin/bash
 ```
 
-**Verify KVNO** (**K**ey **V**ersion **N***umber*) at either Windows or RHEL:
+**Verify KVNO (Key Version Number)** at either Windows or RHEL:
 
 **On Windows:**
 
 ```powershell
-$user = "svc-smb-rw"
 Get-ADUser $user -Properties msDS-KeyVersionNumber | Select-Object msDS-KeyVersionNumber
 ```
 
 **On RHEL:**
 
-```bash
-sudo dnf install -y openldap-clients
-
-user=svc-smb-rw
-realm=LIME.LAN
-
-kinit $user@$realm # Only if expired
-
-# Get LDAP info of $user, including KVNO
-sudo -u $user ldapsearch -H ldap://dc1.lime.lan -Y GSSAPI -b "DC=lime,DC=lan" "(sAMAccountName=$user)" msDS-KeyVersionNumber
-```
 
 **Install required packages:**
 
 ```bash
-dnf install krb5-workstation
+dnf install krb5-workstation openldap-clients
 ```
+
+__Fetch KVNO__
+
+```bash
+user=svc-smb-rw
+
+# Obtain or renew a TGT (Ticket-Granting Ticket)
+sudo -u $user kinit
+
+# Fetch LDAP info including KVNO
+ldapsearch -H ldap://dc1.lime.lan -Y GSSAPI -b "DC=lime,DC=lan" "(sAMAccountName=$user)" msDS-KeyVersionNumber
+```
+
+__Generate Keytab__
 
 **Interactive method:**
 
 ```bash
 sudo ktutil
-# In ktutil session:
-# addent -password -p svc-smb-rw@LIME.LAN -k <KVNO> -e aes256-cts-hmac-sha1-96
+addent -password -p svc-smb-rw@LIME.LAN -k <KVNO> -e aes256-cts-hmac-sha1-96
 # <enter password>
 # wkt /etc/svc-smb-rw.keytab
 # quit
@@ -351,21 +308,21 @@ EOF
 
 ---
 
-### RHEL Host: Kerberos Mount
+### RHEL Host : Mount CIFS as AD user by Kerberos AuthN
 
 By AD User (service account) __`sw-smb-rw`__
 
 #### 1. Install Packages
 
 ```bash
-sudo dnf install cifs-utils krb5-workstation openldap-clients
+sudo dnf install cifs-utils krb5-workstation
 ```
 
 #### 2. Deploy Keytab
 
-Copy the keytab file generated on Windows to `/etc/svc-smb-rw.keytab` on each RHEL host.
-
-#### 3. Set Keytab Permissions
+After [genverating the keytab file](#generate-keytab-file),
+If generated on WinSrv (AD) domain controller, 
+then install to  `/etc/svc-smb-rw.keytab` on each RHEL host:
 
 ```bash
 sudo chown svc-smb-rw:svc-smb-rw /etc/svc-smb-rw.keytab
@@ -381,7 +338,7 @@ user=svc-smb-rw
 # - Used to obtain tickets without a password. 
 # - Doesn't change unless regenerated
 #   (e.g., after password rotation or KVNO bump).
-sudo klist -k -t /etc/$user.keytab
+sudo klist -kte /etc/$user.keytab
 
 # Credential cache
 # - Dynamic/runtime cache of actual Kerberos tickets 
@@ -408,11 +365,13 @@ ktpass -princ $user@$realm -mapuser $user@$realm -pass $password -crypto AES256-
 #### 5. Acquire Kerberos Ticket
 
 ```bash
-# Acquire ticket for service-account user (using keytab file)
-sudo -u svc-smb-rw kinit -k -t /etc/svc-smb-rw.keytab svc-smb-rw@LIME.LAN
+user=scc-smb-rw
+realm=LIME.LAN
+# Acquire ticket (TGT) for service-account user (using keytab file)
+sudo -u $user kinit -kt /etc/$user.keytab $user@$realm
 
 # Verify the new ticket is in their credential cache
-sudo -u svc-smb-rw klist  
+sudo -u $user klist  
 ```
 
 > **Note:** The ticket must be acquired as the service account user, not root.
@@ -420,7 +379,10 @@ sudo -u svc-smb-rw klist
 #### 6. Mount SMB Share
 
 ```bash
-sudo mount -t cifs //dc1.lime.lan/SMBData /mnt/smb-data-01 -o sec=krb5,vers=3.0,cruid=$(id -u svc-smb-rw),uid=$(id -u svc-smb-rw),gid=$(id -g svc-smb-rw),file_mode=0640,dir_mode=0775
+server=dc1.lime.lan
+share=SMBData
+mnt=/mnt/smb-data-01
+sudo mount -t cifs //$server/$share $mnt -o sec=krb5,vers=3.0,cruid=$(id -u svc-smb-rw),uid=$(id -u svc-smb-rw),gid=$(id -g svc-smb-rw),file_mode=0640,dir_mode=0775
 
 # Verify access to file created by Windows Administrator
 sudo -u svc-smb-rw bash -c '
@@ -433,6 +395,8 @@ sudo -u svc-smb-rw bash -c '
         tee -a /mnt/smb-data-01/created-by-$(id -un)-at-cifs-mnt-krb5-authn-in-$(hostname -f).txt
 '
 ```
+- CRUID (**CR**edential **U**ser **ID**) is UID of the AD User (service account) that authenticates by Kerberos.
+- UID/GID can be any; whatever fits the Linux-client use case.
 
 <a name="configure-auto-ticket-renewal"></a>
 
