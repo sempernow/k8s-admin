@@ -5,9 +5,9 @@
 ############################################################################ 
 
 ok(){
-    v=v0.0.30
+    v=v0.0.34
     base=https://raw.githubusercontent.com/rancher/local-path-provisioner
-    manifest=local-path-storage.yaml
+    manifest=local-path-storage-$v.yaml
     [[ -r $manifest ]] || curl -sSLO $base/$v/deploy/$manifest
     [[ -r $manifest ]] && kubectl apply -f $manifest 
     

@@ -8,11 +8,11 @@ spec:
     image: nginx:stable-alpine
     imagePullPolicy: IfNotPresent
     volumeMounts:
-    - name: volv
+    - name: data
       mountPath: /data
     ports:
     - containerPort: 80
   volumes:
-  - name: volv
+  - name: data
     persistentVolumeClaim:
       claimName: local-path-pvc
