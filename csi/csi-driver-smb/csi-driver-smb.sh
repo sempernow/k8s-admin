@@ -159,11 +159,11 @@ krbTktService() {
 	[Service]
 	Type=oneshot
 	User=$user
-	# 1. Refresh file cache for Linux Kernel (CIFS/SMB client) integration with K8s CSI Driver 
+	# 1. Refresh file cache for Linux kernel integration with Kubernetes tools (csi-driver-smb)
 	Environment=KRB5CCNAME=FILE:/var/lib/kubelet/kerberos/krb5cc_$(id $user -u)
 	ExecStart=/usr/bin/kinit -k -t /etc/${user}.keytab ${user}@$realm
 
-	# 2. Refresh KCM cache of SSSD's KCM (Kerberos Credential Manager) for Host-level tools (klist, ldapsearch, ssh) 
+	# 2. Refresh KCM cache for host-level tools (klist, ldapsearch, ssh) 
 	ExecStartPost=/bin/bash -c 'KRB5CCNAME=KCM: /usr/bin/kinit -k -t /etc/${user}.keytab ${user}@$realm'
 	EOH
 

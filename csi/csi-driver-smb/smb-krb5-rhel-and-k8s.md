@@ -197,28 +197,34 @@ mountCIFSntlmssp(){
 
 AD User (service account) __`sw-smb-rw`__ AuthN by Kerberos
 
-
 ### Kerberos ___Credentials Cache___
 
-__KCM__ is SSSD's **K**erberos **C**redential **M**anager. 
-When a Linux (RHEL) host is joined into the AD domain via "`realm join`" 
-(or manual SSSD config), __the default credential cache__, 
-declared in **`/etc/krb5.conf`**, 
-is set to KCM:
+- **`klist`**
+    - `KCM:<CRUID>` (**KCM-based** cache)
+        - The modern, daemon-based method;  
+          supercedes kernel-based _keyring_ method
+        - Configuration: **`/etc/krb5.conf`**
+            ```ini
+            [libdefaults]
+                # Set KCM as the default cache store
+                default_ccache_name = KCM:
+            ```
+    - `FILE:/tmp/krb5cc_<CRUID>` (**File-based** cache)
+        - The original Kerberos ticket-management scheme;  
+          has many shortcomings.
 
-```ini
-[libdefaults]
-    default_ccache_name = KCM:
-```
+__Generate__ a per-user __keytab__ and __use file-based Kerberos cache__
 
-That's why `kinit` run _as any user_ stores tickets in KCM automatically, 
-and why our `klist` shows `KCM:322203108` rather than `FILE:/tmp/krb5cc_322203108`.
-
----
 <a id="generate-keytab-file"></a>
 
-### Kerberos ___Keytab___
+### Kerberos ___Keytab___ file
 
+**`/etc/<USERNAME>.keytab`**
+
+Required by non-login users (service accounts and machine accounts).  
+It contains their credentials and used to obtain (init/renew) Kerberos tickets.  
+Users are known to Kerberos by their SPN (**S**ervice **P**rincipal **N**ame):  
+`<USERNAME>@<REALM_FQDN>`
 
 #### Option A: Generate on Windows Server (Recommended)
 
@@ -269,12 +275,21 @@ __Fetch KVNO__
 
 ```bash
 user=svc-smb-rw
+dc1=lime
+dc2=lan
+realm=${dc1^^}.${dc2^^}
+dc=dc1.${realm,,}
 
-# Obtain or renew a TGT (Ticket-Granting Ticket)
-sudo -u $user kinit
+# Obtain or renew a TGT (Ticket-Granting Ticket) 
+# 1. Stored in KCM-based cache
+sudo -u $user@$realm kinit #... prompts for $user password
+# 2. Stored in File-based cache. (Requires keytab file.)
+sudo -u $user KRB5CCNAME=FILE:/tmp/krb5cc_$(id -u $user) \
+    kinit -k -t /etc/${user}.keytab ${user}@$realm
 
 # Fetch LDAP info including KVNO
-ldapsearch -H ldap://dc1.lime.lan -Y GSSAPI -b "DC=lime,DC=lan" "(sAMAccountName=$user)" msDS-KeyVersionNumber
+sudo -u $user ldapsearch -H ldap://$dc -Y GSSAPI -b "DC=$dc1,DC=$dc2" "(sAMAccountName=$user)" msDS-KeyVersionNumber
+
 ```
 
 __Generate Keytab__
@@ -303,6 +318,7 @@ wkt /etc/$user.keytab
 quit
 EOF
 ```
+- Do *not use quotation marks* around password in the heredoc; ~~`"$pass"`~~
 
 > **Warning:** `ktutil` is a local-only tool that doesn't query AD for the current KVNO. __Always verify__ the KVNO __before generating a keytab__ on RHEL.
 
