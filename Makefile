@@ -101,7 +101,6 @@ menu :
 	@echo "  -down      : Teardown the chart"
 	@echo "  -test      : Test dynamic PV provisioning and write access thereto by Pod/PVC manifest"
 	@echo "  -test-down : Teardown the test Pod/PVC/PV"
-	@echo "csi-nfs      : Install K8s CSI SC and Provisioner for NFS "
 	@echo "csi-smb      : K8s csi-driver-smb ..."
 	@echo " -host       : Configure nodes for CIFS (SMB) mounts"
 	@echo " -krb-status:  klist"

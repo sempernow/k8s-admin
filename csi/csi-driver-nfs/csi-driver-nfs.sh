@@ -1,15 +1,18 @@
 #!/usr/bin/env bash
+# CSI Driver NFS
+# https://github.com/kubernetes-csi/csi-driver-nfs
+#
 [[ $1 ]] || cat "$BASH_SOURCE"
-
 # Server
 export NFS_SERVER='a0.lime.lan'
 export NFS_EXPORT_PATH='/srv/nfs/k8s'
 
 # Client 
+
+version=4.13.1 # 4.11.0
 repo=csi-driver-nfs
 url=https://raw.githubusercontent.com/kubernetes-csi/$repo/master/charts
 chart=csi-driver-nfs
-version=4.11.0
 release=csi-nfs
 ns=kube-system
 template=helm.template.yaml
@@ -88,6 +91,17 @@ installBySet(){
         --set externalSnapshotter.enabled=true \
         --set controller.runOnControlPlane=true \
         --set controller.replicas=2
+}
+
+scAnnotate(){
+    # https://kubernetes.io/docs/reference/labels-annotations-taints/
+    # Example annotation:
+    # "kubernetes.io/description=Provisioner csi-driver-nfs configured to delete PV path on PVC delete"
+    sc=$1
+    key="$2"
+    val="$3"
+    [[ $3 ]] || return 1
+    kubectl annotate StorageClass $sc "$key"="$val" --overwrite=true
 }
 
 manifest(){
