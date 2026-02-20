@@ -310,6 +310,35 @@ mountCIFSkrb5(){
     
     return 0
 }
+## Mount SMB share as user $1 using Kerberos for AuthN; persist
+mountCIFSkrb5Persist(){
+    [[ "$(id -u)" -ne 0 ]] && return 1
+    [[ $1 ]] || return 2
+    smb_krb5_user=$1
+    mode=${2:-service} # service|group|unmount
+
+    server=dc1.lime.lan
+    share=SMBdata
+    smb_admins=ad-smb-admins
+    cruid="$(id -u $smb_krb5_user)"
+    uid="$(id -u $smb_user)"
+    # Allow R/W access by all members of AD Group 'ad-smb-admins'
+    gid="$(getent group $smb_admins |cut -d: -f3)"
+    mnt=/mnt/smb-data-01
+    mkdir -p $mnt || return 3
+
+    [[ $mode == unmount ]] && {
+        umount $mnt
+        ls -hl $mnt
+        return $?
+    }
+    grep -q $mnt /etc/fstab 2>/dev/null || {
+        sudo tee -a <<-EOH
+		## SMB : $(id $svc)
+		//$server/$share  $mnt  cifs  vers=3.0,sec=krb5,cruid=$cruid,uid=$uid,gid=$gid,dir_mode=0775,file_mode=0660    0 0
+		EOH
+    }
+}
 verifyAccess(){
     [[ $1 ]] && user=$1 || user=$smb_user
     echo "ℹ️ Verify access by $user@$(hostname -f) : $(id $user)"
