@@ -120,6 +120,10 @@ menu :
 	@echo "metrics      : Install metrics-server, enabling: kubectl top …"
 	@echo "dashboard    : Install K8s Dashboard : Web UI for K8s API"
 	@echo "prom-*       : kube-prometheus-stack"
+	@echo "  -pull      : Pull the latest chart archive"
+	@echo "  -template  : Build the K8s manifests from chart templates"
+	@echo "  -images    : Extract all images of all (sub)charts to file"
+	@echo "  -values    : Extract all values files of all (sub)charts to files"
 	@echo "  -install   : Install by Helm chart"
 	@echo "  -access    : Forward Grafana port for local access (Remove: pkill kubectl)"
 	@echo "  -delete    : Delete the running release"
@@ -864,6 +868,10 @@ vector-delete vector-uninstall :
 	$(INFO) 'Vector logging stack removed'
 
 kps :=observability/metrics/prometheus-grafana/kps/stack.sh
+prom-pull :
+	bash ${ADMIN_SRC_DIR}/${kps} pull
+prom-inspect :
+	bash ${ADMIN_SRC_DIR}/${kps} inspect
 prom-install prom-apply :
 	bash ${ADMIN_SRC_DIR}/${kps} install
 prom-access :

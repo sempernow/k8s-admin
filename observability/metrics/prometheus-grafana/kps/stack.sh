@@ -5,38 +5,65 @@
 #######################################################
 set -euo pipefail
 
-export RELEASE='kps'
-export NAMESPACE='kube-metrics'
-
-install(){
-
-    # Helm binary if not already
-    v=v3.17.3
+installHelm(){
+    ver=v3.17.3
     what=linux-amd64
-    url=https://get.helm.sh/helm-$v-$what.tar.gz
+    url=https://get.helm.sh/helm-${ver}-$what.tar.gz
     type -t helm > /dev/null 2>&1 &&
-        helm version |grep $v > /dev/null 2>&1 || {
+        helm version |grep $VER > /dev/null 2>&1 || {
             echo '  INSTALLing helm'
             curl -sSfL $url |tar -xzf - &&
                 sudo install $what/helm /usr/local/bin/ &&
                     rm -rf $what &&
                         echo ok || echo ERR : $?
         }
-
-    # Chart
-    v=72.4.0
-    repo=prometheus-community
-    chart=kube-prometheus-stack
-    values=values.minimal.yaml # Minimal diff for core functionality.
-    opts="-n $NAMESPACE --create-namespace --version $v -f $values" 
-    helm repo add $repo https://$repo.github.io/helm-charts --force-update &&
-        helm show values $repo/$chart --version $v |tee values.yaml &&
-            helm template $RELEASE $repo/$chart $opts |tee helm.template.yaml &&
-                helm upgrade $RELEASE $repo/$chart --install $opts
-
-    grep image: helm.template.yaml |sort -u |sed 's/^[[:space:]]*//g' |cut -d' ' -f2 |sed 's/"//g' >kps.images.log
 }
 
+export RELEASE='kps'
+export NAMESPACE='kube-metrics'
+# Chart
+VER=82.4.0
+REPO=prometheus-community
+CHART=kube-prometheus-stack
+VALUES=values.minimal.yaml # Minimal diff for core functionality.
+OPTS="-n $NAMESPACE --create-namespace --version $VER -f $VALUES" 
+ARCHIVE=${CHART}-$VER.tgz
+
+pull(){
+    [[ $(find . -type f -iname '*.tgz') ]] ||
+        helm pull $REPO/$CHART
+    find . -type f -iname '*.tgz' -printf "%P\n"
+}
+template(){
+    helm template $RELEASE $REPO/$CHART $OPTS |tee helm.template.yaml
+}
+imagesExtract(){
+    template
+    echo -e '\n=== Chart images'
+    grep image: helm.template.yaml |
+        sort -u |
+        sed 's/^[[:space:]]*//g' |
+        cut -d' ' -f2 |sed 's/"//g' |
+        tee kps.images
+}
+valuesExtract(){
+    template >/dev/null
+    echo -e '\n=== (Sub)Chart values file(s)'
+    tar -tvf $ARCHIVE  |
+        grep values.yaml |
+        awk '{print $6}' |
+        xargs -n1 tar -xaf $ARCHIVE &&
+            find $CHART -type f -exec /bin/bash -c '
+                fname=${1%/*};fname=${fname##*/};echo $fname;mv $1 values.$fname.yaml
+            ' _ {} \; && rm -rf $CHART
+    find . -type f -iname 'values.*.yaml'
+}
+install(){
+    helm repo add $REPO https://$REPO.github.io/helm-charts --force-update &&
+        helm show values $REPO/$CHART --version $VER |tee values.yaml &&
+            helm template $RELEASE $REPO/$CHART $OPTS |tee helm.template.yaml &&
+                helm upgrade $RELEASE $REPO/$CHART --install $OPTS
+}
 access(){
     _access(){
         ns=${NAMESPACE:-kube-metrics}
@@ -82,11 +109,10 @@ access(){
         }
     done
 }
-
 delete(){
     helm delete $RELEASE -n $NAMESPACE
 }
 
-pushd ${BASH_SOURCE%/*} || pushd . || exit 1
+pushd ${BASH_SOURCE%/*} >/dev/null || pushd . >/dev/null || exit 1
 "$@" || echo "❌  ERR : $?" >&2
-popd
+popd >/dev/null
