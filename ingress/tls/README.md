@@ -1,5 +1,14 @@
 # TLS
 
+**UPDATE**: **See `windows-server project`** for fixes to **browser errors**:
+
+- `DNS_PROBE_FINISHED_NXDOMAIN` error
+    - Disable Secure DNS
+- `CRYPT_E_REVOCATION_OFFLINE` error
+    - Add Group Policy to exempt local domains from CRL check of TLS handshake
+    - Add local domain's root CA to Window's `LocalMachine` trust store (`certlm`).
+
+
 ## AD CS 
 
 Certificate issuance under Microsoft's manual PKI hellscape

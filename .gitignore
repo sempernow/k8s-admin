@@ -5,4 +5,5 @@
 **/*.key
 **/*.cdx.*
 **/*.sbom.*
+**/secret*.yaml
 scripts/kubeadm*.yaml
