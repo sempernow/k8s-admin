@@ -58,6 +58,7 @@ parsers.conf: |
 ```
 
 This becomes an infinite maintenance nightmare:
+
 - Every new application needs a custom parser
 - Every log format change breaks collection
 - No logs = silent failures
@@ -157,6 +158,7 @@ data:
 ```
 
 **Problems:**
+
 - Requires regex expertise
 - One parser per application type
 - Easy to get regex wrong → silent failures
@@ -186,6 +188,7 @@ data:
 ```
 
 **Benefits:**
+
 - Zero per-app configuration
 - Works with any log format
 - JSON logs get structured parsing
@@ -196,9 +199,11 @@ data:
 ## The Bottom Line
 
 **Fluentbit/Fluentd Philosophy:**
+
 > "Tell me exactly what your logs look like, and I'll collect them"
 
 **Vector Philosophy:**
+
 > "I'll collect everything, and figure out the format automatically"
 
 For a Kubernetes cluster with diverse applications, Vector's approach is the only practical solution.
