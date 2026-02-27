@@ -5,7 +5,7 @@
 
 ok(){
     # yq
-    ver=v4.47.2
+    ver=v4.52.4
     bin=yq_linux_amd64
     base=https://github.com/mikefarah/yq/releases/download/$ver
 
@@ -22,4 +22,3 @@ ok(){
     yq --version 
 }
 ok
-
