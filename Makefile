@@ -1,7 +1,7 @@
 ##############################################################################
 ## Makefile.settings : Environment Variables for Makefile(s)
 include Makefile.settings
-include Makefile.bootstrap.settings
+include Makefile.settings.bootstrap
 # … ⋮ ︙ • ● – — ™ ® © ± ° ¹ ² ³ ¼ ½ ¾ ÷ × ₽ € ¥ £ ¢ ¤ ♻ ⚐ ⚑ ✪ ❤  \ufe0f
 # ☢ ☣ ☠ ¦ ¶ § † ‡ ß µ Ø ƒ Δ ☡ ☈ ☧ ☩ ✚ ☨ ☦ ☓ ♰ ♱ ✖  ☘  웃 𝐀𝐏𝐏 🡸 🡺 ➔
 # ℹ️ ⚠️ ✅ ⌛ 🚀 🚧 🛠️ 🔧 🔍 🧪 👈 ⚡ ❌ 💡 🔒 📊 📈 🧩 📦 🥇 ✨️ 🔚
@@ -59,7 +59,7 @@ menu :
 	@echo "  -log       : Recently DROPped packets : journalctl --since='${ADMIN_JOURNAL_SINCE}' |grep DROP"
 	$(INFO) "🚀  3. Initialize the K8s cluster"
 	@echo "init         : Create 1st control node of the cluster"
-	@echo "  -purge     : Purge Makefile.bootstrap.settings of stale PKI params"
+	@echo "  -purge     : Purge Makefile.settings.bootstrap of stale PKI params"
 	@echo "  -gen       : Generate ${K8S_KUBEADM_CONF_INIT} from template (.yaml.tpl)"
 	@echo "  -push      : Upload ${K8S_KUBEADM_CONF_INIT} to all nodes"
 	@echo "  -images    : kubeadm config images pull …"
@@ -86,6 +86,9 @@ menu :
 	@echo "join-command : Print join command for control-plane node : same cert key/hash; new token"
 	@echo "join-token   : kubeadm token list"
 	@echo "init-certs   : Only on join and ONLY IF CERTIFICATE KEY EXPIRED"
+	$(INFO) "🚧  Observability"
+	@echo "metrics      : Install metrics-server, enabling: kubectl top …"
+	@echo "dashboard    : Install K8s Dashboard : Web UI for K8s API"
 	$(INFO) "🚧  Ingress"
 	@echo "ingress-nginx: Ingress NGINX Controller"
 	@echo "  -status    : kubectl get "
@@ -432,7 +435,7 @@ init-certs :
 	scp -p ${ADMIN_SRC_DIR}/scripts/kubeadm-init-certs.sh ${ADMIN_USER}@${K8S_NODE_INIT}:. \
 	    && ssh -t ${ADMIN_USER}@${K8S_NODE_INIT} sudo bash kubeadm-init-certs.sh ${K8S_KUBEADM_CONF_INIT} \
 	    |tee ${ADMIN_SRC_DIR}/logs/${LOG_PRE}.init-certs.${UTC}.log
-	scp -p ${ADMIN_USER}@${K8S_NODE_INIT}:Makefile.bootstrap.settings Makefile.bootstrap.settings
+	scp -p ${ADMIN_USER}@${K8S_NODE_INIT}:Makefile.settings.bootstrap Makefile.settings.bootstrap
 join-control : join-prep join-now
 join-prep : join-gen join-push
 ## K8S_CERTIFICATE_KEY must be set PRIOR TO RUNNING join-gen
@@ -550,6 +553,16 @@ kubeproxy-restore :
 	    --type=json \
 	    -p='[{"op": "remove", "path": "/spec/template/spec/nodeSelector/${selector}"}]'
 
+## Observability
+
+metrics metrics-up :
+	bash ${ADMIN_SRC_DIR}/observability/metrics/metrics-server/metrics-server.sh apply
+metrics-down:
+	bash ${ADMIN_SRC_DIR}/observability/metrics/metrics-server/metrics-server.sh delete
+dashboard :
+	bash ${ADMIN_SRC_DIR}/observability/metrics/dashboard/dashboard.sh
+
+
 journal journald journalctl :
 	ansibash "sudo journalctl --no-pager -u kubelet --since='${ADMIN_JOURNAL_SINCE}' |grep -i error"
 version :
@@ -638,13 +651,6 @@ add-k8s-users :
 	ansibash -u scripts/add-k8s-users.sh
 	ansibash sudo bash add-k8s-users.sh
 
-metrics metrics-up :
-	bash ${ADMIN_SRC_DIR}/observability/metrics/metrics-server/metrics-server.sh apply
-metrics-down:
-	bash ${ADMIN_SRC_DIR}/observability/metrics/metrics-server/metrics-server.sh delete
-dashboard :
-	bash ${ADMIN_SRC_DIR}/observability/metrics/dashboard/dashboard.sh
-
 # k apply -f observability/metrics/dashboard/recommended.yaml
 # k -n kubernetes-dashboard create token kubernetes-dashboard
 # printf "\n  %s\n" Access @ http://localhost:8001/api/v1/namespaces/kubernetes-dashboard/services/https:kubernetes-dashboard:/proxy/
@@ -680,163 +686,6 @@ ingress-nginx-e2e-down ingress-nginx-e2e-tls-down ingress-nginx-e2e-teardown :
 	bash ${ADMIN_SRC_DIR}/ingress/ingress-nginx/e2e/test-ingress.sh teardown || echo ERR $$?
 ingress-nginx-down ingress-nginx-teardown :
 	bash ${ADMIN_SRC_DIR}/${ingress} teardown
-
-trivy :
-	bash ${ADMIN_SRC_DIR}/security/trivy/trivy-operator-install.sh
-
-#csi_nfs_dir := csi/nfs-subdir-external-provisioner
-csi_nfs_dir := csi/csi-driver-nfs
-csi-nfs : csi-nfs2
-csi-nfs-down : csi-nfs2-down
-csi-nfs-test : csi-nfs2-test
-csi-nfs-test-down : csi-nfs2-test-down
-csi-nfs2 :
-	pushd ${csi_nfs_dir} \
-	    && bash csi-driver-nfs.sh install
-csi-nfs2-down :
-	pushd ${csi_nfs_dir} \
-	    && bash csi-driver-nfs.sh teardown
-csi-nfs2-test : 
-	kubectl create ns csi-test
-	kubectl apply -n csi-test -f ${csi_nfs_dir}/csi-driver-nfs-test.yaml 
-	kubectl apply -n csi-test -f ${csi_nfs_dir}/csi-driver-nfs-test-secure.yaml 
-csi-nfs2-test-down : 
-	kubectl delete -n csi-test -f ${csi_nfs_dir}/csi-driver-nfs-test.yaml 
-	kubectl delete -n csi-test -f ${csi_nfs_dir}/csi-driver-nfs-test-secure.yaml 
-	kubectl delete ns csi-test
-csi-nfs1 :
-	pushd csi/nfs-subdir-external-provisioner \
-	    && bash nfs-subdir-provisioner.sh
-csi-nfs1-test : 
-	kubectl apply -f csi/nfs-subdir-external-provisioner/app.test-nfs.yaml 
-
-smb_krb5_user := svc-smb-rw
-#smb_pass := $(shell agede ${ADMIN_SRC_DIR}/csi/csi-driver-smb/svc-smb-rw.creds.age)
-# Domain is in NetBIOS name format: EXAMPLE, not EXAMPLE.COM
-smb_short := LIME
-smb_long  := LIME.LAN
-csi-smb-host : csi-smb-keytab csi-smb-creds
-	ansibash 'type -t klist || sudo dnf -y install cifs-utils krb5-workstation'
-	ansibash -u ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh
-	ansibash sudo bash csi-driver-smb.sh chartNodePrep ${smb_krb5_user}
-	ansibash sudo bash csi-driver-smb.sh installTools ${smb_krb5_user}
-	ansibash sudo bash csi-driver-smb.sh krbKeytabInstall ${smb_krb5_user}
-	ansibash sudo bash csi-driver-smb.sh krbTktService ${smb_krb5_user} ${smb_long}
-	ansibash bash csi-driver-smb.sh krbTktStatus ${smb_krb5_user}
-csi-smb-keytab :
-	@type -t agede && agede ${ADMIN_SRC_DIR}/csi/csi-driver-smb/${smb_krb5_user}.keytab.age \
-	  > ${ADMIN_SRC_DIR}/csi/csi-driver-smb/${smb_krb5_user}.keytab
-	ansibash -u ${ADMIN_SRC_DIR}/csi/csi-driver-smb/${smb_krb5_user}.keytab
-	rm ${ADMIN_SRC_DIR}/csi/csi-driver-smb/${smb_krb5_user}.keytab
-csi-smb-creds :
-	@type -t agede >/dev/null 2>&1 && \
-	  ansibash sudo bash csi-driver-smb.sh smbSetCreds \
-	    ${smb_krb5_user} $(shell agede ${ADMIN_SRC_DIR}/csi/csi-driver-smb/svc-smb-rw.creds.age) ${smb_short} \
-		  || echo "❌ FAILed to decrypt smb password"
-csi-smb-krb-status : 
-	ansibash -u ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh
-	ansibash bash csi-driver-smb.sh krbTktStatus ${smb_krb5_user}
-
-# Modes : service:group
-mode := service 
-csi-smb-host-mount :
-	ansibash -u ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh
-	ansibash sudo bash csi-driver-smb.sh mountCIFSkrb5 ${smb_krb5_user} ${mode}
-csi-smb-host-test :
-	ansibash -u ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh
-	ansibash bash csi-driver-smb.sh verifyAccess 
-csi-smb-host-unmount csi-smb-host-umount :
-	ansibash -u ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh
-	ansibash sudo bash csi-driver-smb.sh mountCIFSkrb5 ${smb_krb5_user} unmount
-
-csi-smb-chart-prep : 
-	rm ${ADMIN_SRC_DIR}/csi/csi-driver-smb/helm.template.yaml || true
-	bash ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh chartPrep
-
-csi-smb-up : csi-smb-chart-prep
-	bash ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh chartUp
-csi-smb-get :
-	bash ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh chartGet
-csi-smb-down : 
-	bash ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh chartDown
-
-csi-smb-test-up : 
-	bash ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh smbTest apply
-csi-smb-test-get :
-	bash ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh smbTestGet
-csi-smb-test-down : 
-	bash ${ADMIN_SRC_DIR}/csi/csi-driver-smb/csi-driver-smb.sh smbTest delete
-
-csi-local :
-	bash ${ADMIN_SRC_DIR}/csi/local-path-provisioner/local-path-provisioner.sh
-csi-rook-up :
-	bash ${ADMIN_SRC_DIR}/csi/rook/rook.sh up
-rbd := sdb__VERIFY_OR_MODIFY
-## Reboot after rook teardown
-csi-rook-down :
-	bash ${ADMIN_SRC_DIR}/csi/rook/rook.sh down
-	ansibash -u ${ADMIN_SRC_DIR}/csi/rook/rook.sh
-	ansibash sudo bash ./rook.sh host_teardown
-	ansibash 'sudo wipefs --all /dev/${rbd} && sudo dd if=/dev/zero of=/dev/${rbd} bs=1M count=10'
-
-efk := logging/elastic/efk-chatgpt/stack.sh
-efk-apply :
-	bash ${ADMIN_SRC_DIR}/${efk} apply
-efk-forward :
-	bash ${ADMIN_SRC_DIR}/${efk} forward
-efk-delete :
-	bash ${ADMIN_SRC_DIR}/${efk} delete
-efk-verify :
-	bash ${ADMIN_SRC_DIR}/${efk} verify
-
-loki := logging/loki/stack.sh
-loki-install :
-	bash ${ADMIN_SRC_DIR}/${loki} upgrade
-loki-delete :
-	bash ${ADMIN_SRC_DIR}/${loki} uninstall
-
-vector := logging/vector/evk-complete.yaml
-vector-install vector-apply :
-	$(INFO) 'Installing Elasticsearch + Vector + Kibana logging stack'
-	kubectl apply -f ${ADMIN_SRC_DIR}/${vector}
-	@echo "Waiting for Elasticsearch to be ready (may take 2-3 minutes)..."
-	kubectl wait --for=condition=ready pod -l app=elasticsearch -n logging --timeout=300s || true
-	@echo "Waiting for Kibana to be ready..."
-	kubectl wait --for=condition=ready pod -l app=kibana -n logging --timeout=300s || true
-	@echo "Waiting for Vector DaemonSet to be ready..."
-	kubectl rollout status daemonset/vector -n logging --timeout=180s || true
-	$(INFO) 'Vector logging stack deployed successfully'
-	@echo "Kibana available at: http://NODE_IP:30561"
-	@echo "See logging/vector/DEPLOY-VECTOR.md for setup instructions"
-vector-status :
-	$(INFO) 'Vector logging stack status'
-	kubectl get pods,svc -n logging
-	@echo ""
-	@echo "Elasticsearch indices:"
-	kubectl exec -n logging elasticsearch-0 -- curl -s 'http://localhost:9200/_cat/indices?v' 2>/dev/null || echo "Elasticsearch not ready yet"
-vector-logs :
-	$(INFO) 'Recent Vector logs'
-	kubectl logs -n logging daemonset/vector --tail=100
-vector-delete vector-uninstall :
-	$(INFO) 'Removing Vector logging stack'
-	kubectl delete -f ${ADMIN_SRC_DIR}/${vector} || true
-	kubectl delete pvc -n logging --all || true
-	$(INFO) 'Vector logging stack removed'
-
-kps :=observability/metrics/prometheus-grafana/kps/stack.sh
-prom-pull :
-	bash ${ADMIN_SRC_DIR}/${kps} pull
-prom-inspect :
-	bash ${ADMIN_SRC_DIR}/${kps} inspect
-prom-install prom-apply :
-	bash ${ADMIN_SRC_DIR}/${kps} install
-prom-access :
-	bash ${ADMIN_SRC_DIR}/${kps} access
-prom-delete prom-uninstall:
-	pkill kubectl \
-	    && echo "ℹ️ : Killing all kubectl processes" \
-	    || echo "ℹ️ : No kubectl processes were running"
-	bash ${ADMIN_SRC_DIR}/${kps} delete
 
 #teardown : calico-teardown cilium-teardown kuberouter-teardown
 teardown :

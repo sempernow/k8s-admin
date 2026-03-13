@@ -102,7 +102,7 @@ export K8S_NODE_CIDR_MASK     ?= 24
 export K8S_NODE_CIDR6_MASK    ?= 64
 export K8S_CRI_SOCKET         ?= unix:///var/run/containerd/containerd.sock
 export K8S_CGROUP_DRIVER      ?= systemd
-## PKI : See Makefile.bootstrap.settings
+## PKI : See Makefile.settings.bootstrap
 export DOMAIN_CA_CERT := ${PRJ_ROOT}/ingress/tls/lime-dc1-ca.crt
 
 
