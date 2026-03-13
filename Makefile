@@ -689,5 +689,10 @@ ingress-nginx-down ingress-nginx-teardown :
 
 #teardown : calico-teardown cilium-teardown kuberouter-teardown
 teardown :
+ifeq ("$(K8S_ALLOW_TEARDOWN)", "yes")
 	ansibash -u ${ADMIN_SRC_DIR}/scripts/teardown.sh
 	ansibash sudo bash teardown.sh
+else 
+	@echo "⚠️  NO : Must set K8S_ALLOW_TEARDOWN to 'yes'"
+endif
+
