@@ -616,8 +616,8 @@ crictl-images :
 images :
 	kubectl get po -A -o jsonpath='{range .items[*]}{.spec.initContainers[].image}{"\n"}{.spec.containers[*].image}{"\n"}{end}' |sort -u
 crictl-ready crictl-pod-ready crictl-pods-ready crictl-prune :
-	ansibash 'sudo crictl pods |grep NotReady |cut -d" " -f1 |xargs -n1 sudo crictl stopp'
-	ansibash 'sudo crictl pods |grep NotReady |cut -d" " -f1 |xargs -n1 sudo crictl rmp'
+	ansibash 'sudo crictl pods |grep NotReady |cut -d" " -f1 |xargs --no-run-if-empty -n1 sudo crictl stopp'
+	ansibash 'sudo crictl pods |grep NotReady |cut -d" " -f1 |xargs --no-run-if-empty -n1 sudo crictl rmp'
 prune :
 	bash make.recipes.sh prune
 #	bash scripts/kubectl-mass-delete-pods.sh StatusUnk
