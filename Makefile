@@ -116,7 +116,8 @@ menu :
 	@echo "pscpu        : ps sorted by CPU usage"
 	@echo "df           : df -hT"
 	$(INFO) "🔍  Inspect : K8s API"
-	@echo "journal      : kubelet logs … --since='${ADMIN_JOURNAL_SINCE}' (per node)"
+	@echo "kubelet      : systemctl status ..."
+	@echo "journal      : kubelet logs … --since='${ADMIN_JOURNAL_SINCE}'"
 	@echo "version      : GET /version"
 	@echo "health       : GET /livez, /readyz"
 	@echo "apiserver    : Timeout errors of K8s API server logs"
@@ -562,7 +563,8 @@ metrics-down:
 dashboard :
 	bash ${ADMIN_SRC_DIR}/observability/metrics/dashboard/dashboard.sh
 
-
+kubelet :
+	@ansibash systemctl status kubelet --no-pager --full
 journal journald journalctl :
 	ansibash "sudo journalctl --no-pager -u kubelet --since='${ADMIN_JOURNAL_SINCE}' |grep -i error"
 version :
